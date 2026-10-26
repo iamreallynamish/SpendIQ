@@ -155,6 +155,9 @@ export function normalizeMerchantName(merchantRaw: string): string {
   if (/\bUNIQLO\b/i.test(m)) {
     return 'UNIQLO';
   }
+  if (/\b(?:MAX\s*VALU|MAXVALU|COMONOKE|AEON\s*MAXVALU)\b/i.test(m)) {
+    return 'MAXVALU COMONOKE';
+  }
   if (/\b(?:BIC\s*CAMERA|BICCAMERA)\b/i.test(m)) {
     return 'BIC CAMERA';
   }
@@ -203,42 +206,47 @@ export function smartCategorizeExpense(merchantRaw: string, rawLine = ''): strin
     return 'Cash Withdrawal';
   }
 
-  // 2. Convenience Store (Strict word boundaries to never match 7117)
+  // 2. Groceries & Supermarket (MaxValu, Comonoke, AEON, Supermarkets, Big, Life, Seiyu)
+  if (/\b(?:MAX\s*VALU|MAXVALU|COMONOKE|AEON|LIFE|SEIYU|ITO[\-\s]*YOKADO|SUPERMARKET|GROCERY|VEGETABLE|MEAT|FISH|MARKET)\b/i.test(text)) {
+    return 'Groceries & Supermarket';
+  }
+
+  // 3. Convenience Store (Strict word boundaries to never match 7117)
   if (/\b(?:7[\-\s]ELEVEN|SEVEN[\-\s]*ELEVEN|7[\-\s\/]11|SEVEN[\s&]+I|7[\s&]+I|FAMILY\s*MART|FAMILYMART|FAMIMA|LAWSON|MINISTOP|DAILY\s*YAMAZAKI|NEWDAYS|CONBINI|COMBINI|SEICO\s*MART)\b/.test(text)) {
     return 'Convenience Store';
   }
 
-  // 3. Travel & Transit
+  // 4. Travel & Transit
   if (/MOBILE\s*SUICA|SUICA|PASMO|ICOCA|MANACA|TOICA|JR\s|JR\-|SHINKANSEN|MEITETSU|SUBWAY|METRO|LINIMO|AONAMI|KINTETSU|HANKYU|TOBU|ODAKYU|KEIO|SEIBU|BUS|TAXI|UBER(?!\s*EATS)|DIDI|GO\s*TAXI|ANA\b|JAL\b|INDIGO|AIR\s*INDIA|FLIGHT|TRAIN|TRANSIT|TRAVEL/.test(text)) {
     return 'Travel & Transit';
   }
 
-  // 4. Clothing & Apparel
+  // 5. Clothing & Apparel
   if (/\bUNIQLO\b|\bGU\b|\bG\.U\.\b|\bZARA\b|H&M|SHIMAMURA|WEGO|ABC[\-\s]*MART|NIKE|ADIDAS|PUMA|ASICS|ONITSUKA|NEW\s*BALANCE|GAP\b|LEVI|ZOZO|CLOTH|APPAREL|FASHION|SHIRT|SHOES/.test(text)) {
     return 'Clothing & Apparel';
   }
 
-  // 5. Furniture & Home
+  // 6. Furniture & Home
   if (/NITORI|IKEA|FRANCFRANC|CAINZ|DCM|KOHNAN|DAISO|SERIA|CAN\s*DO|CANDO|3COINS|MUJI|FURNITURE|HOME\s*CENTER/.test(text)) {
     return 'Furniture & Home';
   }
 
-  // 6. Electronics & Tech
+  // 7. Electronics & Tech
   if (/BIC\s*CAMERA|YODOBASHI|YAMADA|EDION|NOJIMA|SOFMAP|APPLE|AMAZON|SONY|NINTENDO|AKIHABARA|ELECTRONIC|TECH|CROMA|RELIANCE\s*DIGITAL/.test(text)) {
     return 'Electronics & Tech';
   }
 
-  // 7. Utilities & Telecom
+  // 8. Utilities & Telecom
   if (/RAKUTEN\s*MOBILE|SOFTBANK|DOCOMO|\bAU\b|KDDI|POVO|LINEMO|AHAMO|AIRTEL|JIO|ELECTRIC|GAS|WATER|UTILITY|WIFI|BROADBAND/.test(text)) {
     return 'Utilities & Telecom';
   }
 
-  // 8. Healthcare & Pharmacy
+  // 9. Healthcare & Pharmacy
   if (/MATSUMOTO\s*KIYOSHI|WELCIA|SUGI\s*DRUG|SUGI\s*PHARMACY|SUNDRUG|TSURUHA|COCOKARA|PHARMACY|DRUGSTORE|CLINIC|HOSPITAL|MEDICAL|APOLLO\s*PHARMACY|NETMEDS|1MG/.test(text)) {
     return 'Healthcare & Pharmacy';
   }
 
-  // 9. Food & Dining (Dining, cafes, food delivery, bakeries)
+  // 10. Food & Dining (Dining, cafes, food delivery, bakeries)
   if (/STARBUCKS|MCDONALD|KFC|BURGER|PIZZA|DOMINO|SWIGGY|ZOMATO|CAFE|COFFEE|RESTAURANT|DINING|BAKERY|RAMEN|SUSHI|CURRY|BREAD|LUNCH|DINNER|EAT|FOOD/.test(text)) {
     return 'Food & Dining';
   }
@@ -252,28 +260,31 @@ export function smartCategorizeExpense(merchantRaw: string, rawLine = ''): strin
 
 export function getCategoryBadgeStyle(cat: string): string {
   const c = (cat || '').toLowerCase();
+  if (c.includes('grocer') || c.includes('supermarket')) {
+    return 'bg-[#E8FF1F]/15 text-[#E8FF1F] border border-[#E8FF1F]/30';
+  }
   if (c.includes('convenience') || c.includes('conbini')) {
-    return 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+    return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
   }
   if (c.includes('food') || c.includes('dining')) {
-    return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+    return 'bg-orange-500/15 text-orange-300 border border-orange-500/30';
   }
   if (c.includes('clothing') || c.includes('apparel') || c.includes('shopping')) {
-    return 'bg-amber-500/15 text-amber-300 border-white/10';
+    return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
   }
   if (c.includes('travel') || c.includes('transit')) {
-    return 'bg-teal-500/15 text-teal-300 border-teal-500/30';
+    return 'bg-teal-500/15 text-teal-300 border border-teal-500/30';
   }
   if (c.includes('withdrawal') || c.includes('cash') || c.includes('atm')) {
-    return 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+    return 'bg-rose-500/15 text-rose-300 border border-rose-500/30';
   }
   if (c.includes('furniture') || c.includes('home') || c.includes('living')) {
-    return 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+    return 'bg-amber-500/15 text-amber-300 border border-amber-500/30';
   }
   if (c.includes('electronic') || c.includes('tech')) {
-    return 'bg-zinc-500/15 text-zinc-300 border-zinc-500/30';
+    return 'bg-zinc-500/15 text-zinc-300 border border-zinc-500/30';
   }
-  return 'bg-[#181a20] text-zinc-300 border-white/[0.08]';
+  return 'bg-[#181a20] text-zinc-300 border border-white/[0.08]';
 }
 
 export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem {

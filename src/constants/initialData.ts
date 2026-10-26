@@ -12,6 +12,7 @@ export const CATEGORY_LIST: ExpenseCategory[] = [
   'Utilities & Telecom',
   'Healthcare & Pharmacy',
   'Education & Dorm',
+  'Groceries & Supermarket',
 ];
 
 export const INITIAL_DATA: FamilyDatabasePayload = {

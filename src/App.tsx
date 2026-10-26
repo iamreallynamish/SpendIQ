@@ -17,6 +17,8 @@ import { EditTransactionModal } from './components/modals/EditTransactionModal';
 import { CloudDbModal } from './components/modals/CloudDbModal';
 import { AddItemModal } from './components/modals/AddFixedItemModal';
 import { CategoryDetailModal } from './components/modals/CategoryDetailModal';
+import { ReceiptScannerModal } from './components/modals/ReceiptScannerModal';
+import { ReceiptDetailModal } from './components/modals/ReceiptDetailModal';
 import { Edit3, Menu, X } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
@@ -81,6 +83,8 @@ const MainLayout: React.FC = () => {
       <CloudDbModal />
       <AddItemModal />
       <CategoryDetailModal />
+      <ReceiptScannerModal />
+      <ReceiptDetailModal />
 
       {/* TOAST NOTIFICATION */}
       <Toast />

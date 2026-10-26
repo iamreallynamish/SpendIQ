@@ -1,6 +1,6 @@
 import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { Sliders, FileText, Database, Calendar } from 'lucide-react';
+import { Camera, ScanLine, Sparkles, FileText, Database, Calendar } from 'lucide-react';
 import { Currency } from '../../types/finance';
 
 export const Header: React.FC = () => {
@@ -13,6 +13,7 @@ export const Header: React.FC = () => {
     availableMonths,
     dbStatusMsg,
     openModal,
+    openReceiptScannerForTx,
   } = useFinance();
 
   const currencies: Currency[] = ['JPY', 'INR', 'USD'];
@@ -81,24 +82,25 @@ export const Header: React.FC = () => {
           ))}
         </div>
 
-        {/* Card Balances Button */}
+        {/* Visual Intelligence Receipt Scanner Button */}
         <button
           type="button"
-          onClick={() => openModal('cardBalancesModal')}
-          className="bento-btn-secondary h-8 px-3 text-xs"
+          onClick={() => openReceiptScannerForTx(null)}
+          className="bento-btn-primary h-8 px-3 text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(232,255,31,0.25)] hover:shadow-[0_0_20px_rgba(232,255,31,0.4)] transition-all cursor-pointer"
+          title="Scan store receipt / bill with Visual Intelligence"
         >
-          <Sliders className="w-3.5 h-3.5 text-amber-400" />
-          <span>Card Balances</span>
+          <Camera className="w-3.5 h-3.5 text-black" />
+          <span className="font-bold text-black">Scan Bill (AI)</span>
         </button>
 
         {/* Bulk SMS Parser Button */}
         <button
           type="button"
           onClick={() => openModal('smsModal')}
-          className="bento-btn-primary h-8 px-3 text-xs"
+          className="bento-btn-secondary h-8 px-3 text-xs"
         >
           <FileText className="w-3.5 h-3.5" />
-          <span>Bulk SMS Parser</span>
+          <span>SMS Parser</span>
         </button>
       </div>
     </header>

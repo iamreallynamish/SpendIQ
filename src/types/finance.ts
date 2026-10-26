@@ -13,7 +13,33 @@ export type ExpenseCategory =
   | 'Electronics & Tech'
   | 'Utilities & Telecom'
   | 'Healthcare & Pharmacy'
-  | 'Education & Dorm';
+  | 'Education & Dorm'
+  | 'Groceries & Supermarket';
+
+export interface ReceiptItem {
+  name: string;
+  price: number;
+  qty?: number;
+  category?: string;
+}
+
+export interface ReceiptData {
+  storeName: string;
+  storeBranch?: string;
+  date?: string;
+  time?: string;
+  totalAmount: number;
+  subtotal?: number;
+  taxAmount?: number;
+  currency?: string;
+  paymentMethod?: string;
+  cardLast4?: string;
+  recommendedCategory?: string;
+  items: ReceiptItem[];
+  summary?: string;
+  imageUrl?: string;
+  scannedAt: string;
+}
 
 export interface Transaction {
   id: string;
@@ -31,6 +57,7 @@ export interface Transaction {
   amountInr: number;
   smsBalance?: number | null;
   manualOverride?: boolean;
+  receipt?: ReceiptData;
 }
 
 export interface FixedExpense {

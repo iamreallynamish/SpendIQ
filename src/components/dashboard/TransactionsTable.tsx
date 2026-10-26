@@ -2,7 +2,7 @@ import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { formatFromJpy } from '../../utils/currency';
 import { getCategoryBadgeStyle, getTxMonthKey } from '../../utils/smsParser';
-import { ReceiptText, Sparkles, Edit2, Trash2, ArrowUpDown, Filter, X } from 'lucide-react';
+import { ReceiptText, Sparkles, Edit2, Trash2, ArrowUpDown, Filter, X, Camera, Receipt, ShoppingBag } from 'lucide-react';
 import { Transaction } from '../../types/finance';
 
 export const TransactionsTable: React.FC = () => {
@@ -20,6 +20,8 @@ export const TransactionsTable: React.FC = () => {
     selectedCategory,
     setSelectedCategory,
     openCategoryInspector,
+    openReceiptScannerForTx,
+    openReceiptDetailForTx,
   } = useFinance();
 
   // Dynamic categories present in transactions
@@ -176,17 +178,47 @@ export const TransactionsTable: React.FC = () => {
                     {/* Merchant & Subtext */}
                     <td className="py-3.5 pr-4">
                       <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0 ${tx.iconBg || 'bg-zinc-800'}`}
+                        <button
+                          type="button"
+                          onClick={() => tx.receipt ? openReceiptDetailForTx(tx) : openReceiptScannerForTx(tx)}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shrink-0 cursor-pointer hover:scale-105 transition-transform ${tx.iconBg || 'bg-zinc-800'}`}
+                          title={tx.receipt ? 'View itemized bill' : 'Scan receipt for this swipe'}
                         >
                           {tx.letter || tx.merchant.charAt(0).toUpperCase()}
-                        </div>
+                        </button>
                         <div className="min-w-0">
-                          <div className="font-semibold text-white truncate max-w-[200px]">
+                          <button
+                            type="button"
+                            onClick={() => tx.receipt ? openReceiptDetailForTx(tx) : openReceiptScannerForTx(tx)}
+                            className="font-semibold text-white truncate max-w-[200px] text-left hover:text-[#E8FF1F] transition-colors cursor-pointer block"
+                          >
                             {tx.merchant}
-                          </div>
-                          <div className="text-[10px] text-zinc-400 truncate max-w-[200px]">
-                            {tx.subtext || 'Card Transaction'}
+                          </button>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] text-zinc-400 truncate max-w-[140px]">
+                              {tx.subtext || 'Card Transaction'}
+                            </span>
+                            {tx.receipt ? (
+                              <button
+                                type="button"
+                                onClick={() => openReceiptDetailForTx(tx)}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#E8FF1F]/10 text-[#E8FF1F] border border-[#E8FF1F]/25 text-[9px] font-mono hover:bg-[#E8FF1F]/20 cursor-pointer"
+                                title="Click to view itemized purchased items & prices"
+                              >
+                                <Receipt className="w-2.5 h-2.5" />
+                                <span>{tx.receipt.items?.length || 0} items</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openReceiptScannerForTx(tx)}
+                                className="inline-flex items-center gap-1 text-[9px] text-zinc-500 hover:text-[#E8FF1F] transition-colors cursor-pointer"
+                                title="Upload bill photo for visual itemization"
+                              >
+                                <Camera className="w-2.5 h-2.5" />
+                                <span>+ Scan Bill</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -242,6 +274,27 @@ export const TransactionsTable: React.FC = () => {
                     {/* Actions */}
                     <td className="py-3.5 pl-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                        {/* Visual Intelligence Receipt Action */}
+                        {tx.receipt ? (
+                          <button
+                            type="button"
+                            onClick={() => openReceiptDetailForTx(tx)}
+                            title="View itemized bill items & prices"
+                            className="p-1.5 rounded-lg text-[#E8FF1F] hover:bg-[#E8FF1F]/15 transition-colors cursor-pointer"
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openReceiptScannerForTx(tx)}
+                            title="Scan bill with Visual Intelligence"
+                            className="p-1.5 rounded-lg text-zinc-400 hover:text-[#E8FF1F] hover:bg-white/10 transition-colors cursor-pointer"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => handleEdit(tx.id)}

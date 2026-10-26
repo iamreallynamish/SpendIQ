@@ -9,9 +9,11 @@ import {
   NextMonthPlanItem,
   FamilyDatabasePayload,
   StagedSmsItem,
+  ReceiptData,
+  CardCode,
 } from '../types/finance';
 import { INITIAL_DATA } from '../constants/initialData';
-import { recalculateCardBalances, getTxMonthKey, smartCategorizeExpense, normalizeMerchantName } from '../utils/smsParser';
+import { recalculateCardBalances, getTxMonthKey, smartCategorizeExpense, normalizeMerchantName, extractSmsDate } from '../utils/smsParser';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, onSnapshot, setDoc, getDocFromServer } from 'firebase/firestore';
 
@@ -54,6 +56,12 @@ interface FinanceContextType {
   closeModal: () => void;
   editingTxId: string | null;
   setEditingTxId: (id: string | null) => void;
+  selectedTxForReceipt: Transaction | null;
+  setSelectedTxForReceipt: (tx: Transaction | null) => void;
+  openReceiptScannerForTx: (tx?: Transaction | null) => void;
+  openReceiptDetailForTx: (tx: Transaction) => void;
+  attachReceiptToTransaction: (txId: string, receiptData: ReceiptData) => void;
+  recordTransactionFromReceipt: (receiptData: ReceiptData, cardCode?: CardCode) => Transaction;
 
   // Toast
   toastMessage: string | null;
@@ -121,6 +129,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
+  const [selectedTxForReceipt, setSelectedTxForReceipt] = useState<Transaction | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTimer, setToastTimer] = useState<number | null>(null);
 
@@ -276,6 +285,94 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setInspectingCategory(cat);
     setActiveModal('categoryDetailModal');
   }, []);
+
+  const openReceiptScannerForTx = useCallback((tx?: Transaction | null) => {
+    setSelectedTxForReceipt(tx || null);
+    setActiveModal('receiptScannerModal');
+  }, []);
+
+  const openReceiptDetailForTx = useCallback((tx: Transaction) => {
+    setSelectedTxForReceipt(tx);
+    setActiveModal('receiptDetailModal');
+  }, []);
+
+  const attachReceiptToTransaction = useCallback((txId: string, receiptData: ReceiptData) => {
+    setData((prev) => {
+      const newTxs = prev.transactions.map((tx) => {
+        if (tx.id !== txId) return tx;
+        return {
+          ...tx,
+          receipt: receiptData,
+          category: (tx.category === 'Regular Transaction' || !tx.category) && receiptData.recommendedCategory
+            ? receiptData.recommendedCategory
+            : tx.category,
+        };
+      });
+      const nextState: FamilyDatabasePayload = {
+        ...prev,
+        transactions: newTxs,
+        updatedAt: Date.now(),
+      };
+      saveLocally(nextState);
+      syncToFirestore(nextState);
+      return nextState;
+    });
+    showToast(`Visual Intelligence: Attached receipt for ${receiptData.storeName}!`);
+  }, [saveLocally, syncToFirestore, showToast]);
+
+  const recordTransactionFromReceipt = useCallback((receiptData: ReceiptData, cardCode?: CardCode): Transaction => {
+    const card: CardCode = cardCode || (receiptData.cardLast4 === '7117' ? 'AXIS' : 'ICICI');
+    const store = receiptData.storeName || 'MAXVALU COMONOKE';
+    const amt = Number(receiptData.totalAmount) || 0;
+    const cat = receiptData.recommendedCategory || 'Groceries & Supermarket';
+
+    let dateStr = '26-Oct-2026';
+    let ts = Date.now();
+    if (receiptData.date) {
+      const dObj = extractSmsDate(receiptData.date);
+      dateStr = dObj.dateStr;
+      ts = dObj.timestampMs;
+    }
+
+    const newTx: Transaction = {
+      id: 'tx_rec_' + Date.now(),
+      merchant: store.toUpperCase(),
+      letter: store === '7-ELEVEN' ? '7' : (store.charAt(0).toUpperCase() || 'M'),
+      iconBg: store.toLowerCase().includes('max') ? 'bg-emerald-600' : 'bg-zinc-800',
+      subtext: receiptData.storeBranch ? `${receiptData.storeBranch}` : 'Visual Receipt Scan',
+      category: cat,
+      cardCode: card,
+      cardUsed: card === 'AXIS' ? 'Axis Bank XX7117' : 'ICICI Forex XX0817',
+      spender: role === 'DAD' ? 'Dad' : 'Son',
+      date: dateStr,
+      timestampMs: ts,
+      amountJpy: card === 'AXIS' ? Math.round(amt * 1.8) : amt,
+      amountInr: card === 'AXIS' ? amt : Math.round(amt / 1.8),
+      receipt: receiptData,
+      manualOverride: true,
+    };
+
+    const targetMonth = getTxMonthKey(newTx);
+    setSelectedMonth(targetMonth);
+
+    setData((prev) => {
+      const updatedTxs = [newTx, ...prev.transactions].sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+      const { icici, axis } = recalculateCardBalances(updatedTxs, targetMonth, prev.icici, prev.axis);
+      const nextData: FamilyDatabasePayload = {
+        ...prev,
+        updatedAt: Date.now(),
+        transactions: updatedTxs,
+        icici,
+        axis,
+      };
+      saveLocally(nextData);
+      syncToFirestore(nextData);
+      return nextData;
+    });
+
+    showToast(`Recorded new ${card} swipe for ${store} (¥${amt.toLocaleString()})!`);
+    return newTx;
+  }, [role, setSelectedMonth, saveLocally, syncToFirestore, showToast]);
 
   // Compute available months dynamically from transactions
   const availableMonths = useMemo(() => {
@@ -858,6 +955,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         closeModal,
         editingTxId,
         setEditingTxId,
+        selectedTxForReceipt,
+        setSelectedTxForReceipt,
+        openReceiptScannerForTx,
+        openReceiptDetailForTx,
+        attachReceiptToTransaction,
+        recordTransactionFromReceipt,
         toastMessage,
         showToast,
         addTransactions,
