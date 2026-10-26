@@ -34,6 +34,11 @@ interface FinanceContextType {
   setSelectedCalDay: (d: number) => void;
   targetAllowance: number;
   setTargetAllowance: (a: number) => void;
+  selectedCategory: string | null;
+  setSelectedCategory: (cat: string | null) => void;
+  inspectingCategory: string | null;
+  setInspectingCategory: (cat: string | null) => void;
+  openCategoryInspector: (cat: string) => void;
 
   // Data & Real-Time Sync
   data: FamilyDatabasePayload;
@@ -111,6 +116,8 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [cardFilter, setCardFilter] = useState<'ALL' | 'ICICI' | 'AXIS'>('ALL');
   const [selectedCalDay, setSelectedCalDay] = useState<number>(8);
   const [targetAllowance, setTargetAllowance] = useState<number>(75000);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [inspectingCategory, setInspectingCategory] = useState<string | null>(null);
 
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
@@ -265,15 +272,26 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   }, [selectedMonth, saveLocally]);
 
-  // Compute available months dynamically
+  const openCategoryInspector = useCallback((cat: string) => {
+    setInspectingCategory(cat);
+    setActiveModal('categoryDetailModal');
+  }, []);
+
+  // Compute available months dynamically from transactions
   const availableMonths = useMemo(() => {
-    const set = new Set<string>(['Oct-2026', 'Sep-2026', 'Nov-2026']);
+    const set = new Set<string>();
     data.transactions.forEach((t) => {
       const key = getTxMonthKey(t);
       if (key) set.add(key);
     });
+    if (selectedMonth && selectedMonth !== 'ALL') {
+      set.add(selectedMonth);
+    }
+    if (set.size === 0) {
+      set.add('Oct-2026');
+    }
     return Array.from(set);
-  }, [data.transactions]);
+  }, [data.transactions, selectedMonth]);
 
   const setCloudDbUrl = useCallback((url: string) => {
     setCloudDbUrlState(url);
@@ -334,6 +352,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (staged.length === 0) return 0;
     const colors = ['bg-[#10b981] text-white', 'bg-[#d97706] text-white', 'bg-[#f59e0b] text-black', 'bg-[#e11d48] text-white', 'bg-[#0d9488] text-white'];
 
+    let targetMonth = selectedMonth;
+    if (staged.length > 0) {
+      const parsedMonth = getTxMonthKey({ date: staged[0].date } as Transaction);
+      if (parsedMonth && selectedMonth !== 'ALL') {
+        targetMonth = parsedMonth;
+        setSelectedMonth(parsedMonth);
+      }
+    }
+
     setData((prev) => {
       const newTxs = [...prev.transactions];
       const newNotes = { ...prev.calendarNotes };
@@ -359,9 +386,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         };
         newTxs.push(newTx);
 
-        const dayMatch = item.date.match(/^(\d{2})-Oct-2026$/i);
-        if (dayMatch) {
-          const dayNum = String(parseInt(dayMatch[1], 10));
+        const dayNumMatch = item.date.match(/^(\d{1,2})/);
+        if (dayNumMatch) {
+          const dayNum = String(parseInt(dayNumMatch[1], 10));
           newNotes[dayNum] = {
             title: `${item.merchant.slice(0, 10)} ¥${Number(item.amountJpy).toLocaleString('en-US')}`,
             type: 'spend',
@@ -370,7 +397,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       });
 
       const deduplicated = deduplicateTransactions(newTxs).sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
-      const { icici, axis } = recalculateCardBalances(deduplicated, selectedMonth, prev.icici, prev.axis);
+      const { icici, axis } = recalculateCardBalances(deduplicated, targetMonth, prev.icici, prev.axis);
 
       const nextState: FamilyDatabasePayload = {
         ...prev,
@@ -815,6 +842,11 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         setSelectedCalDay,
         targetAllowance,
         setTargetAllowance,
+        selectedCategory,
+        setSelectedCategory,
+        inspectingCategory,
+        setInspectingCategory,
+        openCategoryInspector,
         data,
         cloudDbUrl,
         setCloudDbUrl,

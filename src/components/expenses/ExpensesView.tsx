@@ -3,7 +3,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { formatFromJpy } from '../../utils/currency';
 import { getTxMonthKey } from '../../utils/smsParser';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { ArrowRight, PieChart as PieIcon, Sliders, Zap } from 'lucide-react';
+import { ArrowRight, PieChart as PieIcon, Sliders, Zap, Filter, X } from 'lucide-react';
 
 const COLORS = [
   '#E8FF1F', // Neon Lime
@@ -23,9 +23,13 @@ export const ExpensesView: React.FC = () => {
     data,
     currency,
     selectedMonth,
+    setSelectedMonth,
     targetAllowance,
     setTargetAllowance,
     openModal,
+    selectedCategory,
+    setSelectedCategory,
+    openCategoryInspector,
   } = useFinance();
 
   const monthTxs = useMemo(() => {
@@ -106,6 +110,60 @@ export const ExpensesView: React.FC = () => {
         </div>
       </div>
 
+      {/* Category Filter Active Banner */}
+      {selectedCategory && (
+        <div className="p-3.5 rounded-2xl bg-[#E8FF1F]/10 border border-[#E8FF1F]/30 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-7 h-7 rounded-xl bg-[#E8FF1F] flex items-center justify-center text-black font-extrabold text-xs">
+              <Filter className="w-3.5 h-3.5" />
+            </span>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <span>Expenses Filtered by Category:</span>
+                <span className="bento-chip bento-chip-neon font-mono text-xs">{selectedCategory}</span>
+              </div>
+              <div className="text-[11px] text-zinc-300 font-mono mt-0.5">
+                Click category badge to inspect highest transactions or clear filter.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openCategoryInspector(selectedCategory)}
+              className="text-xs font-semibold text-[#E8FF1F] hover:underline cursor-pointer"
+            >
+              Inspect Highest &rsaquo;
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCategory(null)}
+              className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Clear category filter"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cross-Month Notice when current month has 0 transactions */}
+      {chartData.length === 0 && data.transactions.length > 0 && selectedMonth !== 'ALL' && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between">
+          <div className="text-xs text-amber-200">
+            Current view <strong className="font-mono text-white">{selectedMonth}</strong> has 0 expenses recorded, but you have{' '}
+            <strong className="text-white">{data.transactions.length}</strong> total transactions in your ledger.
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedMonth('ALL')}
+            className="bento-btn-primary h-7 px-3 text-xs"
+          >
+            <span>View All Months</span>
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Category Spend Breakdown (Left 5 cols) */}
         <div className="lg:col-span-5 bento-card p-5 sm:p-6 flex flex-col items-center justify-between">
@@ -113,7 +171,7 @@ export const ExpensesView: React.FC = () => {
             <div>
               <h2 className="text-sm font-bold text-white tracking-tight">Category Breakdown</h2>
               <p className="text-[11px] text-zinc-400">
-                Filtered for {selectedMonth === 'ALL' ? 'All Months' : selectedMonth.replace('-', ' ')}
+                Click any slice or category to inspect highest transactions
               </p>
             </div>
             <span className="bento-chip font-mono">
@@ -145,6 +203,12 @@ export const ExpensesView: React.FC = () => {
                       outerRadius={98}
                       paddingAngle={3}
                       dataKey="value"
+                      onClick={(entry: any) => {
+                        if (entry && entry.name) {
+                          openCategoryInspector(entry.name);
+                        }
+                      }}
+                      className="cursor-pointer"
                     >
                       {chartData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -174,7 +238,7 @@ export const ExpensesView: React.FC = () => {
             )}
           </div>
 
-          {/* Custom Category Legend */}
+          {/* Custom Category Legend with Click-to-Inspect Highest Transactions */}
           <div className="w-full space-y-2 max-h-56 overflow-y-auto pr-1">
             {chartData.length === 0 ? (
               <div className="py-4 text-center text-xs text-zinc-500 font-mono">
@@ -185,21 +249,27 @@ export const ExpensesView: React.FC = () => {
                 const color = COLORS[idx % COLORS.length];
                 const pct = totalSpendJpy > 0 ? Math.round((item.value / totalSpendJpy) * 100) : 0;
                 return (
-                  <div
+                  <button
                     key={item.name}
-                    className="flex items-center justify-between text-xs py-2 px-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]"
+                    type="button"
+                    onClick={() => openCategoryInspector(item.name)}
+                    className="w-full flex items-center justify-between text-xs py-2 px-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.06] hover:border-[#E8FF1F]/30 transition-all text-left cursor-pointer group"
+                    title={`Click to inspect highest transactions in ${item.name}`}
                   >
-                    <span className="flex items-center gap-2 text-zinc-200 font-medium">
+                    <span className="flex items-center gap-2 text-zinc-200 font-medium min-w-0">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
-                      <span className="truncate max-w-[150px]">{item.name}</span>
+                      <span className="truncate max-w-[130px] group-hover:text-white transition-colors">{item.name}</span>
                     </span>
-                    <span className="font-mono-num font-bold text-white shrink-0 ml-2">
+                    <span className="font-mono-num font-bold text-white shrink-0 ml-2 flex items-center gap-1.5">
                       {formatFromJpy(item.value, currency)}{' '}
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 ml-1 font-mono">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 font-mono">
                         {pct}%
                       </span>
+                      <span className="text-[11px] text-[#E8FF1F] opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                        &rsaquo;
+                      </span>
                     </span>
-                  </div>
+                  </button>
                 );
               })
             )}

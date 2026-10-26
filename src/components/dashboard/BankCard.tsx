@@ -1,22 +1,40 @@
 import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { formatFromJpy, formatInrCard } from '../../utils/currency';
+import { getTxMonthKey } from '../../utils/smsParser';
 import { CreditCard, Clock, Edit2, ShieldCheck, User, Zap, ArrowUpRight, TrendingDown } from 'lucide-react';
 
 export const BankCards: React.FC = () => {
-  const { data, currency, openModal, role, setRole, showToast, targetAllowance } = useFinance();
+  const { data, currency, openModal, role, setRole, showToast, targetAllowance, selectedMonth } = useFinance();
+
+  // Dynamically compute real spent amounts from actual transactions in selected month
+  const monthTxs = React.useMemo(() => {
+    if (selectedMonth === 'ALL') return data.transactions;
+    return data.transactions.filter((tx) => getTxMonthKey(tx) === selectedMonth);
+  }, [data.transactions, selectedMonth]);
+
+  const iciciTxSpentJpy = React.useMemo(() => {
+    return monthTxs
+      .filter((t) => t.cardCode === 'ICICI')
+      .reduce((sum, t) => sum + (Number(t.amountJpy) || 0), 0);
+  }, [monthTxs]);
+
+  const axisTxSpentInr = React.useMemo(() => {
+    return monthTxs
+      .filter((t) => t.cardCode === 'AXIS')
+      .reduce((sum, t) => sum + (Number(t.amountInr) || 0), 0);
+  }, [monthTxs]);
 
   // Calculate combined spending power in active currency
   const iciciJpy = data.icici.balanceJpy ?? 0;
   const axisInr = data.axis.balanceInr ?? 0;
   
-  // Total spend this cycle
-  const iciciSpentJpy = data.icici.spentJpy ?? 0;
-  const axisSpentInr = data.axis.spentInr ?? 0;
+  // Total spend this cycle - automatically driven by uploaded transactions if available
+  const iciciSpentJpy = iciciTxSpentJpy > 0 ? iciciTxSpentJpy : (data.icici.spentJpy ?? 0);
+  const axisSpentInr = axisTxSpentInr > 0 ? axisTxSpentInr : (data.axis.spentInr ?? 0);
 
-  // Compute burn rate
-  const daysInMonth = 31;
-  const currentDailyBurnJpy = Math.round(iciciSpentJpy / 26); // day 26 of Oct
+  // Compute burn rate dynamically
+  const currentDailyBurnJpy = Math.max(0, Math.round(iciciSpentJpy / Math.max(1, new Date().getDate())));
   const isOverPace = currentDailyBurnJpy > targetAllowance;
 
   const toggleRole = () => {

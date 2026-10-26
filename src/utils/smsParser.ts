@@ -13,11 +13,12 @@ export const MONTH_MAP: Record<string, number> = {
   sep: 8, sept: 8, september: 8,
   oct: 9, october: 9,
   nov: 10, november: 10,
-  dec: 11, december: 11
+  dec: 11, december: 11,
 };
 
 export function normalizeYear(yStr: string | number): number {
-  const y = typeof yStr === 'number' ? yStr : parseInt(yStr, 10);
+  const y = typeof yStr === 'number' ? yStr : parseInt(String(yStr), 10);
+  if (isNaN(y)) return 2026;
   if (y < 100) return 2000 + y;
   return y;
 }
@@ -25,7 +26,7 @@ export function normalizeYear(yStr: string | number): number {
 export function buildDateObj(day: number, monthIdx: number, year: number, rawLine = '') {
   const d = Math.max(1, Math.min(31, day));
   const m = Math.max(0, Math.min(11, monthIdx));
-  const y = year;
+  const y = year || 2026;
   let hours = 12, mins = 0, secs = 0;
   if (rawLine) {
     const timeMatch = rawLine.match(/\b(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?\b/i);
@@ -47,12 +48,12 @@ export function buildDateObj(day: number, monthIdx: number, year: number, rawLin
     dayOfMonth: d,
     monthIdx: m,
     year: y,
-    recognized: true
+    recognized: true,
   };
 }
 
 export function extractSmsDate(line: string) {
-  if (!line) return buildDateObj(24, 9, 2026, '');
+  if (!line) return buildDateObj(26, 9, 2026, '');
 
   // 1. DD-MMM-YYYY / DD/MMM/YY / DD MMM YYYY / DDth MMM YYYY
   const dmyAlpha = line.match(/\b(\d{1,2})(?:st|nd|rd|th)?[\s\-\/\.,]+([A-Za-z]{3,9})[\s\-\/\.,]+(\d{2,4})\b/);
@@ -101,79 +102,151 @@ export function extractSmsDate(line: string) {
     }
   }
 
-  const fallback = buildDateObj(24, 9, 2026, line);
+  // 5. DD-MMM or DD MMM or DD/MMM (without year in SMS alert: default to current/2026)
+  const dmAlpha = line.match(/\b(\d{1,2})(?:st|nd|rd|th)?[\s\-\/\.,]+([A-Za-z]{3,9})\b/);
+  if (dmAlpha) {
+    const mKey = dmAlpha[2].toLowerCase();
+    if (MONTH_MAP[mKey] !== undefined) {
+      return buildDateObj(parseInt(dmAlpha[1], 10), MONTH_MAP[mKey], 2026, line);
+    }
+  }
+
+  // 6. DD/MM or DD-MM (without year: e.g. 24/10 or 26-10)
+  const dmNum = line.match(/\b(\d{1,2})[\-\/\.](\d{1,2})\b/);
+  if (dmNum) {
+    const p1 = parseInt(dmNum[1], 10);
+    const p2 = parseInt(dmNum[2], 10);
+    if (p2 >= 1 && p2 <= 12 && p1 >= 1 && p1 <= 31) {
+      return buildDateObj(p1, p2 - 1, 2026, line);
+    }
+  }
+
+  const fallback = buildDateObj(26, 9, 2026, line);
   fallback.recognized = false;
   return fallback;
 }
 
 export function normalizeMerchantName(merchantRaw: string): string {
   const m = (merchantRaw || '').trim().toUpperCase();
-  if (!m || m === 'AXIS CARD MERCHANT' || m === 'JAPAN MERCHANT' || m === 'JAPAN CONBINI / RETAIL' || m === 'ICICI FOREX MERCHANT') {
+  if (
+    !m ||
+    m === 'AXIS CARD MERCHANT' ||
+    m === 'JAPAN MERCHANT' ||
+    m === 'JAPAN CONBINI / RETAIL' ||
+    m === 'ICICI FOREX MERCHANT' ||
+    m === 'REGULAR TRANSACTION'
+  ) {
     return 'REGULAR TRANSACTION';
   }
-  // Normalize all 7-Eleven variations to '7-ELEVEN' (unless it's Seven Bank ATM)
-  if (!/ATM|WITHDRAW/.test(m) && (/7[\-\s\/]*ELEVEN|7[\-\s\/]*11|SEVEN[\-\s]*ELEVEN|SEVEN\s*&\s*I|7\s*&\s*I/.test(m))) {
+
+  // Never match 7117 (Axis card ending) as 7-Eleven
+  if (!/ATM|WITHDRAW|7117|XX7117/.test(m) && /\b(?:7[\-\s]ELEVEN|SEVEN[\-\s]*ELEVEN|7[\-\s\/]11|SEVEN[\s&]+I|7[\s&]+I)\b/i.test(m)) {
     return '7-ELEVEN';
   }
-  if (/FAMILY\s*MART|FAMIMA/.test(m)) {
+  if (/\b(?:FAMILY\s*MART|FAMIMA)\b/i.test(m)) {
     return 'FAMILYMART';
   }
-  if (/^LAWSON\b/.test(m) && !/ATM/.test(m)) {
+  if (/\bLAWSON\b/i.test(m) && !/ATM/.test(m)) {
     return 'LAWSON';
   }
-  return m;
+  if (/\b(?:MOBILE\s*SUICA|SUICA)\b/i.test(m)) {
+    return 'MOBILE SUICA';
+  }
+  if (/\bUNIQLO\b/i.test(m)) {
+    return 'UNIQLO';
+  }
+  if (/\b(?:BIC\s*CAMERA|BICCAMERA)\b/i.test(m)) {
+    return 'BIC CAMERA';
+  }
+  if (/\b(?:YODOBASHI|YODOBASHI\s*CAMERA)\b/i.test(m)) {
+    return 'YODOBASHI CAMERA';
+  }
+  if (/\bNITORI\b/i.test(m)) {
+    return 'NITORI';
+  }
+  if (/\b(?:JR\s*CENTRAL|JR\s*EAST|JR\s*WEST|MEITETSU)\b/i.test(m)) {
+    return 'JR / MEITETSU TRANSIT';
+  }
+  if (/\bSTARBUCKS\b/i.test(m)) {
+    return 'STARBUCKS';
+  }
+  if (/\b(?:MCDONALD'?S|MCDONALDS|MAC)\b/i.test(m)) {
+    return "MCDONALD'S";
+  }
+  if (/\bSWIGGY\b/i.test(m)) {
+    return 'SWIGGY';
+  }
+  if (/\bZOMATO\b/i.test(m)) {
+    return 'ZOMATO';
+  }
+  if (/\bBLINKIT\b/i.test(m)) {
+    return 'BLINKIT';
+  }
+  if (/\bAMAZON\b/i.test(m)) {
+    return 'AMAZON';
+  }
+  if (/\bUBER\b/i.test(m)) {
+    return 'UBER';
+  }
+
+  // Clean trailing punctuation or reference IDs
+  return m.replace(/^AT\s+/i, '').replace(/^TO\s+/i, '').replace(/[\.,;:_\-]+$/, '').trim();
 }
 
 export function smartCategorizeExpense(merchantRaw: string, rawLine = ''): string {
   const normM = normalizeMerchantName(merchantRaw);
-  const text = `${normM} ${merchantRaw || ''} ${rawLine || ''}`.toUpperCase();
+  // Remove 7117 card number so it doesn't trigger 7-11 regex!
+  const text = `${normM} ${merchantRaw || ''} ${rawLine || ''}`.replace(/XX7117|7117/gi, ' ').toUpperCase();
 
   // 1. Cash Withdrawal / ATM
   if (/WITHDRAW|WDL|ATM|CASH\s*ADV|SEVEN\s*BANK|JP\s*BANK|YUCHO|E-NET|LAWSON\s*BANK\s*ATM|MUFG\s*ATM|SMBC\s*ATM/.test(text)) {
     return 'Cash Withdrawal';
   }
 
-  // 2. Convenience Store (7/11, 7-Eleven, Seven Eleven, Seven & i, FamilyMart, Lawson, Ministop, Daily Yamazaki, NewDays)
-  if (/7[\-\s\/]*ELEVEN|7[\-\s\/]*11|SEVEN[\-\s]*ELEVEN|SEVEN\s*&\s*I|7\s*&\s*I|FAMILY\s*MART|FAMILYMART|FAMIMA|LAWSON|MINISTOP|DAILY\s*YAMAZAKI|NEWDAYS|CONBINI|COMBINI|SEICO\s*MART/.test(text)) {
+  // 2. Convenience Store (Strict word boundaries to never match 7117)
+  if (/\b(?:7[\-\s]ELEVEN|SEVEN[\-\s]*ELEVEN|7[\-\s\/]11|SEVEN[\s&]+I|7[\s&]+I|FAMILY\s*MART|FAMILYMART|FAMIMA|LAWSON|MINISTOP|DAILY\s*YAMAZAKI|NEWDAYS|CONBINI|COMBINI|SEICO\s*MART)\b/.test(text)) {
     return 'Convenience Store';
   }
 
-  // 3. Travel & Transit (Mobile Suica, PASMO, ICOCA, Manaca, JR, Meitetsu, Subway, Shinkansen, Uber, Taxi, Airlines)
+  // 3. Travel & Transit
   if (/MOBILE\s*SUICA|SUICA|PASMO|ICOCA|MANACA|TOICA|JR\s|JR\-|SHINKANSEN|MEITETSU|SUBWAY|METRO|LINIMO|AONAMI|KINTETSU|HANKYU|TOBU|ODAKYU|KEIO|SEIBU|BUS|TAXI|UBER(?!\s*EATS)|DIDI|GO\s*TAXI|ANA\b|JAL\b|INDIGO|AIR\s*INDIA|FLIGHT|TRAIN|TRANSIT|TRAVEL/.test(text)) {
     return 'Travel & Transit';
   }
 
-  // 4. Clothing & Apparel (Uniqlo, GU, Zara, H&M, Muji, Shimamura, ABC-Mart, Nike, Adidas, etc.)
+  // 4. Clothing & Apparel
   if (/\bUNIQLO\b|\bGU\b|\bG\.U\.\b|\bZARA\b|H&M|SHIMAMURA|WEGO|ABC[\-\s]*MART|NIKE|ADIDAS|PUMA|ASICS|ONITSUKA|NEW\s*BALANCE|GAP\b|LEVI|ZOZO|CLOTH|APPAREL|FASHION|SHIRT|SHOES/.test(text)) {
     return 'Clothing & Apparel';
   }
 
-  // 5. Furniture & Home (Nitori, IKEA, Francfranc, Daiso, Seria, CanDo, Cainz, Muji)
+  // 5. Furniture & Home
   if (/NITORI|IKEA|FRANCFRANC|CAINZ|DCM|KOHNAN|DAISO|SERIA|CAN\s*DO|CANDO|3COINS|MUJI|FURNITURE|HOME\s*CENTER/.test(text)) {
     return 'Furniture & Home';
   }
 
-  // 6. Electronics & Tech (Bic Camera, Yodobashi, Yamada Denki, Edion, Apple, Amazon, Sony)
-  if (/BIC\s*CAMERA|YODOBASHI|YAMADA|EDION|NOJIMA|SOFMAP|APPLE|AMAZON|SONY|NINTENDO|AKIHABARA|ELECTRONIC|TECH/.test(text)) {
+  // 6. Electronics & Tech
+  if (/BIC\s*CAMERA|YODOBASHI|YAMADA|EDION|NOJIMA|SOFMAP|APPLE|AMAZON|SONY|NINTENDO|AKIHABARA|ELECTRONIC|TECH|CROMA|RELIANCE\s*DIGITAL/.test(text)) {
     return 'Electronics & Tech';
   }
 
-  // 7. Utilities & Telecom (Rakuten Mobile, SoftBank, Docomo, au, Povo, Linemo, Electricity, Gas)
+  // 7. Utilities & Telecom
   if (/RAKUTEN\s*MOBILE|SOFTBANK|DOCOMO|\bAU\b|KDDI|POVO|LINEMO|AHAMO|AIRTEL|JIO|ELECTRIC|GAS|WATER|UTILITY|WIFI|BROADBAND/.test(text)) {
     return 'Utilities & Telecom';
   }
 
-  // 8. Healthcare & Pharmacy (Matsumoto Kiyoshi, Welcia, Sugi, Sundrug)
-  if (/MATSUMOTO\s*KIYOSHI|WELCIA|SUGI\s*DRUG|SUGI\s*PHARMACY|SUNDRUG|TSURUHA|COCOKARA|PHARMACY|DRUGSTORE|CLINIC|HOSPITAL|MEDICAL/.test(text)) {
+  // 8. Healthcare & Pharmacy
+  if (/MATSUMOTO\s*KIYOSHI|WELCIA|SUGI\s*DRUG|SUGI\s*PHARMACY|SUNDRUG|TSURUHA|COCOKARA|PHARMACY|DRUGSTORE|CLINIC|HOSPITAL|MEDICAL|APOLLO\s*PHARMACY|NETMEDS|1MG/.test(text)) {
     return 'Healthcare & Pharmacy';
   }
 
-  // 9. If it's a generic Regular Transaction without a specific food/restaurant keyword, label as 'Regular Transaction'
+  // 9. Food & Dining (Dining, cafes, food delivery, bakeries)
+  if (/STARBUCKS|MCDONALD|KFC|BURGER|PIZZA|DOMINO|SWIGGY|ZOMATO|CAFE|COFFEE|RESTAURANT|DINING|BAKERY|RAMEN|SUSHI|CURRY|BREAD|LUNCH|DINNER|EAT|FOOD/.test(text)) {
+    return 'Food & Dining';
+  }
+
   if (normM === 'REGULAR TRANSACTION') {
     return 'Regular Transaction';
   }
 
-  // 10. Food & Dining (Restaurants, Cafes, Fast Food, Groceries, Supermarkets, and default dining)
   return 'Food & Dining';
 }
 
@@ -208,6 +281,7 @@ export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem {
   const cardCode: CardCode = isAxis ? 'AXIS' : 'ICICI';
   const cardUsed = isAxis ? 'Axis Bank XX7117' : 'ICICI Forex XX0817';
 
+  // 1. Balance extraction
   let smsBalanceRaw: number | null = null;
   let smsBalanceCurrency: 'INR' | 'JPY' = isAxis ? 'INR' : 'JPY';
   const balRegex = /(?:Avl\.?\s*Bal(?:ance)?|Available\s*Bal(?:ance)?|Avbl\.?\s*Bal(?:ance)?|Avl\.?\s*Lmt|Avl\.?\s*Limit|Available\s*Limit|Curr(?:ent)?\s*Bal(?:ance)?|Rem(?:aining)?\s*Bal(?:ance)?|\bBal(?:ance)?)\s*(?:is|:|-)?\s*(?:(JPY|INR|USD|Rs\.?|¥|₹|\$)\s*)?([\d,]+(?:\.\d{1,2})?)/i;
@@ -227,6 +301,7 @@ export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem {
 
   const lineWithoutBal = balMatch ? line.replace(balMatch[0], ' ') : line;
 
+  // 2. Amount extraction
   let amountJpy = 1500;
   let amountInr = Math.round(1500 / 1.8);
   let nativeCurrency: 'JPY' | 'INR' = isAxis ? 'INR' : 'JPY';
@@ -258,34 +333,84 @@ export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem {
     }
   }
 
+  // 3. Date extraction
   const dateInfo = extractSmsDate(line);
 
-  let merchant = 'REGULAR TRANSACTION';
-  const atMatch = lineWithoutBal.match(/\b(?:at|to|in|towards|from|info:?|merchant:?)\s+([A-Za-z0-9\-\s&'\.\/]+?)(?=\s+on\b|\s+dated\b|\s+dt\b|\s+ref\b|\s+\d{1,2}[\-\/\.]|\s+avl\b|\.|$)/i);
-  if (atMatch && atMatch[1]) {
-    const candidate = atMatch[1].trim().replace(/[\.,;:\-]+$/, '').trim();
-    if (candidate.length >= 2 && !/^(axis|icici|bank|card|forex|credit|debit|inr|jpy)$/i.test(candidate)) {
-      merchant = candidate.toUpperCase();
-    }
-  }
-  if (merchant === 'REGULAR TRANSACTION') {
-    if (/withdraw|withdrew|atm|cash\s*adv|wdl/i.test(lineWithoutBal)) {
-      merchant = 'ATM CASH WITHDRAWAL';
-    } else if (/7[\-\s\/]*eleven|7[\-\s\/]*11|seven[\-\s]*eleven/i.test(lineWithoutBal)) {
-      merchant = '7-ELEVEN';
-    } else if (/family\s*mart|familymart/i.test(lineWithoutBal)) {
-      merchant = 'FAMILYMART';
-    } else if (/lawson/i.test(lineWithoutBal)) {
-      merchant = 'LAWSON';
-    } else if (/suica|pasmo|icoca|manaca/i.test(lineWithoutBal)) {
-      merchant = 'MOBILE SUICA';
-    } else if (/uniqlo/i.test(lineWithoutBal)) {
-      merchant = 'UNIQLO';
-    }
-  }
-  merchant = normalizeMerchantName(merchant);
+  // 4. Robust Merchant / Source identification
+  // Clean card mentions and account details first so they don't get captured as the merchant
+  const sanitizedForMerchant = lineWithoutBal
+    .replace(/ICICI\s*Bank\s*(?:Forex|Prepaid|Credit|Debit)?\s*Card\s*(?:XX|\*{2,4}|ending)?\s*\d{2,4}/gi, ' ')
+    .replace(/Axis\s*Bank\s*(?:Credit|Debit)?\s*Card\s*(?:XX|\*{2,4}|ending)?\s*\d{2,4}/gi, ' ')
+    .replace(/Card\s*(?:XX|\*{2,4}|ending\s*with)?\s*\d{2,4}/gi, ' ')
+    .replace(/A\/?c\s*(?:XX|\*{2,4}|ending)?\s*\d{2,4}/gi, ' ')
+    .replace(/\b(?:XX7117|XX0817|4XXX0817|7117|0817)\b/gi, ' ');
 
-  const category = smartCategorizeExpense(merchant, lineWithoutBal);
+  let merchant = 'REGULAR TRANSACTION';
+
+  // Strategy A: UPI VPA (e.g. VPA swiggy@icici or to merchant@okhdfcbank)
+  const upiMatch = sanitizedForMerchant.match(/\b(?:VPA|to)\s+([a-zA-Z0-9\.\-_]+)@[a-zA-Z]+/i);
+  if (upiMatch && upiMatch[1]) {
+    merchant = upiMatch[1].toUpperCase();
+  }
+
+  // Strategy B: "at [MERCHANT]" or "towards [MERCHANT]" or "to [MERCHANT]" or "info: [MERCHANT]"
+  if (merchant === 'REGULAR TRANSACTION') {
+    const atMatch = sanitizedForMerchant.match(
+      /\b(?:at|towards|info:?|merchant:?|paid to)\s+([A-Za-z0-9\-\s&'\.\/]+?)(?=\s+on\b|\s+dated\b|\s+dt\b|\s+ref\b|\s+\d{1,2}[\-\/\.]|\s+avl\b|\s+avail\b|\s+for\b|\.|$|,)/i
+    );
+    if (atMatch && atMatch[1]) {
+      const candidate = atMatch[1].trim().replace(/[\.,;:\-]+$/, '').trim();
+      const lower = candidate.toLowerCase();
+      if (
+        candidate.length >= 2 &&
+        !/^(axis|icici|bank|card|forex|credit|debit|inr|jpy|cardholder|customer|your)$/i.test(lower) &&
+        !/7117|0817/.test(candidate)
+      ) {
+        merchant = candidate.toUpperCase();
+      }
+    }
+  }
+
+  // Strategy C: Keyword scanning for known merchants if merchant is still generic
+  if (merchant === 'REGULAR TRANSACTION') {
+    const textUpper = sanitizedForMerchant.toUpperCase();
+    if (/WITHDRAW|WITHDREW|ATM|CASH\s*ADV|WDL/i.test(textUpper)) {
+      merchant = 'ATM CASH WITHDRAWAL';
+    } else if (/\b(?:7[\-\s]ELEVEN|SEVEN[\-\s]*ELEVEN|7[\-\s\/]11)\b/i.test(textUpper)) {
+      merchant = '7-ELEVEN';
+    } else if (/FAMILY\s*MART|FAMILYMART|FAMIMA/i.test(textUpper)) {
+      merchant = 'FAMILYMART';
+    } else if (/LAWSON/i.test(textUpper)) {
+      merchant = 'LAWSON';
+    } else if (/MOBILE\s*SUICA|SUICA|PASMO|ICOCA/i.test(textUpper)) {
+      merchant = 'MOBILE SUICA';
+    } else if (/UNIQLO/i.test(textUpper)) {
+      merchant = 'UNIQLO';
+    } else if (/BIC\s*CAMERA/i.test(textUpper)) {
+      merchant = 'BIC CAMERA';
+    } else if (/YODOBASHI/i.test(textUpper)) {
+      merchant = 'YODOBASHI CAMERA';
+    } else if (/NITORI/i.test(textUpper)) {
+      merchant = 'NITORI';
+    } else if (/STARBUCKS/i.test(textUpper)) {
+      merchant = 'STARBUCKS';
+    } else if (/SWIGGY/i.test(textUpper)) {
+      merchant = 'SWIGGY';
+    } else if (/ZOMATO/i.test(textUpper)) {
+      merchant = 'ZOMATO';
+    } else if (/BLINKIT/i.test(textUpper)) {
+      merchant = 'BLINKIT';
+    } else if (/AMAZON/i.test(textUpper)) {
+      merchant = 'AMAZON';
+    } else if (/UBER/i.test(textUpper)) {
+      merchant = 'UBER';
+    } else if (/JR\s*CENTRAL|MEITETSU/i.test(textUpper)) {
+      merchant = 'JR / MEITETSU TRANSIT';
+    }
+  }
+
+  merchant = normalizeMerchantName(merchant);
+  const category = smartCategorizeExpense(merchant, sanitizedForMerchant);
 
   let normalizedCardBalance: number | null = null;
   if (smsBalanceRaw !== null) {
@@ -309,7 +434,7 @@ export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem {
     amountInr,
     nativeCurrency,
     smsBalance: normalizedCardBalance,
-    rawLine: line
+    rawLine: line,
   };
 }
 
@@ -320,22 +445,22 @@ export function recalculateCardBalances(
   currentAxis: CardState
 ): { icici: CardState; axis: CardState } {
   const monthKey = selectedMonth || 'Oct-2026';
-  const monthTxs = monthKey === 'ALL'
-    ? transactions
-    : transactions.filter(t => getTxMonthKey(t) === monthKey);
+  const monthTxs =
+    monthKey === 'ALL' ? transactions : transactions.filter((t) => getTxMonthKey(t) === monthKey);
 
-  // 1. ICICI calculations
+  // 1. ICICI calculations:
+  // If month has transactions, compute month spend; otherwise compute total spend
   const iciciSpentJpy = monthTxs
-    .filter(t => t.cardCode === 'ICICI')
+    .filter((t) => t.cardCode === 'ICICI')
     .reduce((sum, t) => sum + (Number(t.amountJpy) || 0), 0);
 
   const iciciTxs = transactions
-    .filter(t => t.cardCode === 'ICICI')
+    .filter((t) => t.cardCode === 'ICICI')
     .slice()
     .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
 
-  let newIciciBalance = currentIcici.balanceJpy ?? 63756;
-  let newIciciLastSync = currentIcici.lastSyncInfo;
+  let newIciciBalance = currentIcici.balanceJpy ?? 0;
+  let newIciciLastSync = currentIcici.lastSyncInfo || 'No transactions yet';
 
   let latestIciciIdx = -1;
   for (let i = iciciTxs.length - 1; i >= 0; i--) {
@@ -353,20 +478,27 @@ export function recalculateCardBalances(
     }
     newIciciBalance = runningBal;
     newIciciLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
+  } else if (iciciTxs.length > 0) {
+    // If balance was set manually and transactions were added without SMS balance
+    const totalIciciSpent = iciciTxs.reduce((sum, t) => sum + (Number(t.amountJpy) || 0), 0);
+    if ((currentIcici.balanceJpy ?? 0) > 0) {
+      newIciciBalance = Math.max(0, (currentIcici.balanceJpy ?? 0) - totalIciciSpent);
+    }
+    newIciciLastSync = `${iciciTxs[iciciTxs.length - 1].date} (${iciciTxs[iciciTxs.length - 1].merchant.slice(0, 14)})`;
   }
 
-  // 2. Axis calculations
+  // 2. Axis calculations:
   const axisSpentInr = monthTxs
-    .filter(t => t.cardCode === 'AXIS')
+    .filter((t) => t.cardCode === 'AXIS')
     .reduce((sum, t) => sum + (Number(t.amountInr) || Math.round((Number(t.amountJpy) || 0) / 1.8)), 0);
 
   const axisTxs = transactions
-    .filter(t => t.cardCode === 'AXIS')
+    .filter((t) => t.cardCode === 'AXIS')
     .slice()
     .sort((a, b) => (a.timestampMs || 0) - (b.timestampMs || 0));
 
-  let newAxisBalance = currentAxis.balanceInr ?? 140000;
-  let newAxisLastSync = currentAxis.lastSyncInfo;
+  let newAxisBalance = currentAxis.balanceInr ?? 0;
+  let newAxisLastSync = currentAxis.lastSyncInfo || 'No transactions yet';
 
   let latestAxisIdx = -1;
   for (let i = axisTxs.length - 1; i >= 0; i--) {
@@ -385,6 +517,15 @@ export function recalculateCardBalances(
     }
     newAxisBalance = runningBalInr;
     newAxisLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
+  } else if (axisTxs.length > 0) {
+    const totalAxisSpent = axisTxs.reduce(
+      (sum, t) => sum + (Number(t.amountInr) || Math.round((Number(t.amountJpy) || 0) / 1.8)),
+      0
+    );
+    if ((currentAxis.balanceInr ?? 0) > 0) {
+      newAxisBalance = Math.max(0, (currentAxis.balanceInr ?? 0) - totalAxisSpent);
+    }
+    newAxisLastSync = `${axisTxs[axisTxs.length - 1].date} (${axisTxs[axisTxs.length - 1].merchant.slice(0, 14)})`;
   }
 
   return {
@@ -392,14 +533,14 @@ export function recalculateCardBalances(
       ...currentIcici,
       balanceJpy: newIciciBalance,
       spentJpy: iciciSpentJpy,
-      lastSyncInfo: newIciciLastSync
+      lastSyncInfo: newIciciLastSync,
     },
     axis: {
       ...currentAxis,
       balanceInr: newAxisBalance,
       spentInr: axisSpentInr,
-      lastSyncInfo: newAxisLastSync
-    }
+      lastSyncInfo: newAxisLastSync,
+    },
   };
 }
 

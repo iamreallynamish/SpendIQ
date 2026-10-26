@@ -2,7 +2,7 @@ import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { formatFromJpy } from '../../utils/currency';
 import { getCategoryBadgeStyle, getTxMonthKey } from '../../utils/smsParser';
-import { ReceiptText, Sparkles, Edit2, Trash2, ArrowUpDown } from 'lucide-react';
+import { ReceiptText, Sparkles, Edit2, Trash2, ArrowUpDown, Filter, X } from 'lucide-react';
 import { Transaction } from '../../types/finance';
 
 export const TransactionsTable: React.FC = () => {
@@ -17,14 +17,29 @@ export const TransactionsTable: React.FC = () => {
     openModal,
     setEditingTxId,
     smartRecategorizeAll,
+    selectedCategory,
+    setSelectedCategory,
+    openCategoryInspector,
   } = useFinance();
 
-  // Filter transactions by selectedMonth and cardFilter
+  // Dynamic categories present in transactions
+  const availableCategories = React.useMemo(() => {
+    const set = new Set<string>();
+    data.transactions.forEach((tx) => {
+      if (tx.category) set.add(tx.category);
+    });
+    return Array.from(set).sort();
+  }, [data.transactions]);
+
+  // Filter transactions by selectedMonth, cardFilter, and selectedCategory
   const filteredTxs = data.transactions.filter((tx) => {
     if (selectedMonth !== 'ALL' && getTxMonthKey(tx) !== selectedMonth) {
       return false;
     }
     if (cardFilter !== 'ALL' && tx.cardCode !== cardFilter) {
+      return false;
+    }
+    if (selectedCategory && tx.category !== selectedCategory) {
       return false;
     }
     return true;
@@ -72,23 +87,55 @@ export const TransactionsTable: React.FC = () => {
           </div>
         </div>
 
-        {/* Card Filter Segmented Control */}
-        <div className="bento-seg self-start sm:self-auto">
-          {(['ALL', 'ICICI', 'AXIS'] as const).map((code) => {
-            const label = code === 'ALL' ? 'All Cards' : code === 'ICICI' ? 'ICICI Forex' : 'Axis Bank';
-            return (
-              <button
-                key={code}
-                type="button"
-                onClick={() => setCardFilter(code)}
-                className={`bento-seg-btn ${
-                  cardFilter === code ? 'bento-seg-btn-active' : ''
-                }`}
+        {/* Filters Group: Card Filter & Category Dropdown */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Category Dropdown */}
+          {availableCategories.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={selectedCategory || 'ALL'}
+                onChange={(e) => setSelectedCategory(e.target.value === 'ALL' ? null : e.target.value)}
+                className="bg-black text-[11px] font-mono font-semibold text-zinc-300 border border-white/10 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
               >
-                {label}
-              </button>
-            );
-          })}
+                <option value="ALL">All Categories</option>
+                {availableCategories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              {selectedCategory && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory(null)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Clear category filter"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Card Filter Segmented Control */}
+          <div className="bento-seg">
+            {(['ALL', 'ICICI', 'AXIS'] as const).map((code) => {
+              const label = code === 'ALL' ? 'All Cards' : code === 'ICICI' ? 'ICICI' : 'Axis';
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setCardFilter(code)}
+                  className={`bento-seg-btn ${
+                    cardFilter === code ? 'bento-seg-btn-active' : ''
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -145,11 +192,16 @@ export const TransactionsTable: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Category Chip */}
+                    {/* Category Chip - Clickable to open category inspector */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold ${getCategoryBadgeStyle(tx.category)}`}>
+                      <button
+                        type="button"
+                        onClick={() => openCategoryInspector(tx.category)}
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold cursor-pointer hover:opacity-85 hover:scale-105 transition-all ${getCategoryBadgeStyle(tx.category)}`}
+                        title={`Click to inspect highest transactions in ${tx.category}`}
+                      >
                         {tx.category}
-                      </span>
+                      </button>
                     </td>
 
                     {/* Card Used */}

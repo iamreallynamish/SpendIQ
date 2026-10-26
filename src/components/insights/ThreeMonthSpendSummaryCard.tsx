@@ -29,21 +29,41 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export const ThreeMonthSpendSummaryCard: React.FC = () => {
-  const { data, currency, openModal } = useFinance();
+  const { data, currency, openModal, openCategoryInspector } = useFinance();
   const [chartMode, setChartMode] = useState<'stacked' | 'grouped'>('stacked');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
 
-  // Determine the last 3 months present in transactions or fallback to Aug, Sep, Oct 2026
+  // Determine the months dynamically present in transactions or fallback to defaults
   const { monthsList, monthlyData, categorySummary, totals } = useMemo(() => {
-    const months = ['Aug-2026', 'Sep-2026', 'Oct-2026'];
-    const monthLabels = ['Aug 2026', 'Sep 2026', 'Oct 2026'];
+    // Collect all unique months present in transactions
+    const monthKeySet = new Set<string>();
+    data.transactions.forEach((tx) => {
+      const k = getTxMonthKey(tx);
+      if (k) monthKeySet.add(k);
+    });
+
+    let months = Array.from(monthKeySet);
+    if (months.length === 0) {
+      months = ['Aug-2026', 'Sep-2026', 'Oct-2026'];
+    } else {
+      months.sort((a, b) => {
+        const [ma, ya] = a.split('-');
+        const [mb, yb] = b.split('-');
+        const dateA = new Date(`${ma} 1, ${ya || 2026}`).getTime();
+        const dateB = new Date(`${mb} 1, ${yb || 2026}`).getTime();
+        return dateA - dateB;
+      });
+      // Pick up to the last 6 months
+      months = months.slice(-6);
+    }
+
+    const monthLabels = months.map((m) => m.replace('-', ' '));
 
     // Map: month -> category -> total JPY
-    const matrix: Record<string, Record<string, number>> = {
-      'Aug-2026': {},
-      'Sep-2026': {},
-      'Oct-2026': {},
-    };
+    const matrix: Record<string, Record<string, number>> = {};
+    months.forEach((m) => {
+      matrix[m] = {};
+    });
 
     const catTotalsOverall: Record<string, number> = {};
 
@@ -66,7 +86,7 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
       };
       let monthTotal = 0;
       Object.keys(catTotalsOverall).forEach((cat) => {
-        const val = matrix[mKey][cat] || 0;
+        const val = matrix[mKey]?.[cat] || 0;
         row[cat] = val;
         monthTotal += val;
       });
@@ -75,7 +95,7 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
     });
 
     const grandTotal3Months = Object.values(catTotalsOverall).reduce((a, b) => a + b, 0);
-    const monthlyAverage = grandTotal3Months / 3;
+    const monthlyAverage = months.length > 0 ? grandTotal3Months / months.length : 0;
 
     // Sort categories by highest spend
     const sortedCats = Object.entries(catTotalsOverall)
@@ -89,10 +109,12 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
 
     const topCategory = sortedCats[0] || { category: 'None', amount: 0, share: 0 };
 
-    // Delta between Month 2 (Sep) and Month 3 (Oct)
-    const sepTotal = Number(chartBars[1]?.total) || 0;
-    const octTotal = Number(chartBars[2]?.total) || 0;
-    const deltaPct = sepTotal > 0 ? ((octTotal - sepTotal) / sepTotal) * 100 : 0;
+    // Delta between last two months in the series
+    const lastIdx = chartBars.length - 1;
+    const prevIdx = chartBars.length - 2;
+    const prevTotal = prevIdx >= 0 ? (Number(chartBars[prevIdx]?.total) || 0) : 0;
+    const latestTotal = lastIdx >= 0 ? (Number(chartBars[lastIdx]?.total) || 0) : 0;
+    const deltaPct = prevTotal > 0 ? ((latestTotal - prevTotal) / prevTotal) * 100 : 0;
 
     return {
       monthsList: monthLabels,
@@ -103,8 +125,8 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
         monthlyAverage,
         topCategory,
         deltaPct,
-        octTotal,
-        sepTotal,
+        octTotal: latestTotal,
+        sepTotal: prevTotal,
       },
     };
   }, [data.transactions]);
@@ -238,22 +260,28 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
         </div>
 
         {/* Metric 3: Top Category */}
-        <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-400">
+        <button
+          type="button"
+          onClick={() => totals.topCategory.category !== 'None' && openCategoryInspector(totals.topCategory.category)}
+          className="p-4 rounded-2xl bg-white/[0.04] border border-white/[0.08] hover:border-[#E8FF1F]/40 transition-all flex flex-col justify-between text-left cursor-pointer group"
+          title="Click to inspect highest transactions in top category"
+        >
+          <div className="flex items-center justify-between w-full">
+            <span className="text-[11px] uppercase tracking-wider font-semibold text-zinc-400 group-hover:text-zinc-200">
               Top Expense Bucket
             </span>
             <span className="bento-chip bg-[#E8FF1F] text-black font-bold">
               {totals.topCategory.share.toFixed(0)}% Share
             </span>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-white truncate mt-3">
+          <div className="text-xl sm:text-2xl font-bold text-white truncate mt-3 group-hover:text-[#E8FF1F] transition-colors">
             {totals.topCategory.category}
           </div>
-          <div className="text-[11px] text-[#A9B2FF] font-mono-num mt-1">
-            {formatFromJpy(totals.topCategory.amount, currency)} total spent
+          <div className="text-[11px] text-[#A9B2FF] font-mono-num mt-1 flex items-center justify-between w-full">
+            <span>{formatFromJpy(totals.topCategory.amount, currency)} total</span>
+            <span className="text-[#E8FF1F] opacity-0 group-hover:opacity-100 transition-opacity">Inspect &rsaquo;</span>
           </div>
-        </div>
+        </button>
 
         {/* Metric 4: Month-over-Month Velocity */}
         <div className="p-4 rounded-2xl bg-gradient-to-br from-[#1b1c24] to-[#0a0a0c] border border-white/[0.1] flex flex-col justify-between">
@@ -390,17 +418,20 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {categorySummary.map((item) => (
-            <div
+            <button
+              type="button"
               key={item.category}
-              className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.15] transition-all flex flex-col justify-between gap-2"
+              onClick={() => openCategoryInspector(item.category)}
+              className="p-3.5 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:border-[#E8FF1F]/40 hover:bg-white/[0.06] transition-all flex flex-col justify-between gap-2 text-left cursor-pointer group"
+              title={`Click to inspect highest transactions in ${item.category}`}
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-2 w-full">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: item.color }}
                   ></span>
-                  <span className="text-xs font-semibold text-white truncate">
+                  <span className="text-xs font-semibold text-white group-hover:text-[#E8FF1F] transition-colors truncate">
                     {item.category}
                   </span>
                 </div>
@@ -420,13 +451,16 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
                 ></div>
               </div>
 
-              <div className="flex items-center justify-between pt-1 text-[11px] text-zinc-400">
-                <span>3-Mo Total</span>
-                <span className="font-mono-num font-bold text-white">
+              <div className="flex items-center justify-between pt-1 text-[11px] text-zinc-400 w-full">
+                <span>Total Spent</span>
+                <span className="font-mono-num font-bold text-white group-hover:text-white flex items-center gap-1">
                   {formatFromJpy(item.amount, currency)}
+                  <span className="text-[#E8FF1F] opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                    &rsaquo;
+                  </span>
                 </span>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
