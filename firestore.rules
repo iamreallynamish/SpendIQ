@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidTransaction(data) {
+      return data.merchant is string && data.merchant.size() <= 100 &&
+             data.category is string && data.category.size() <= 50 &&
+             data.cardCode in ['ICICI', 'AXIS'] &&
+             data.amountJpy is number &&
+             data.date is string && data.date.size() <= 30;
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isValidId(transactionId);
+      allow create, update: if isValidId(transactionId) && isValidTransaction(request.resource.data);
+      allow delete: if isValidId(transactionId);
+    }
+
+    match /cards/{cardId} {
+      allow read: if isValidId(cardId);
+      allow write: if isValidId(cardId);
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Family card transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "merchant": { "type": "string", "maxLength": 100 },
+        "category": { "type": "string", "maxLength": 50 },
+        "cardCode": { "type": "string", "enum": ["ICICI", "AXIS"] },
+        "cardUsed": { "type": "string", "maxLength": 50 },
+        "spender": { "type": "string", "enum": ["Son", "Dad"] },
+        "date": { "type": "string", "maxLength": 30 },
+        "timestampMs": { "type": "number" },
+        "amountJpy": { "type": "number" },
+        "amountInr": { "type": "number" },
+        "smsBalance": { "type": "number" }
+      },
+      "required": ["merchant", "cardCode", "date", "amountJpy"]
+    },
+    "CardState": {
+      "title": "CardState",
+      "description": "Current balances and reload milestones",
+      "type": "object",
+      "properties": {
+        "balanceJpy": { "type": "number" },
+        "balanceInr": { "type": "number" },
+        "spentJpy": { "type": "number" },
+        "spentInr": { "type": "number" },
+        "nextDate": { "type": "string", "maxLength": 30 },
+        "lastSyncInfo": { "type": "string", "maxLength": 50 }
+      }
+    }
+  },
+  "firestore": {
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Collection of recorded family transactions"
+    },
+    "/cards/{cardId}": {
+      "schema": "CardState",
+      "description": "Current state for ICICI and Axis cards"
+    }
+  }
+}

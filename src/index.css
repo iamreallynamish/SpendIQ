@@ -1,0 +1,287 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --acc: #E8FF1F; /* Bento signature neon lime */
+    --acc-hover: #f1ff52;
+    --acc-dim: rgba(232, 255, 31, 0.14);
+    --t1: #ffffff;
+    --t2: rgba(255, 255, 255, 0.65);
+    --t3: rgba(255, 255, 255, 0.40);
+    --hair: rgba(255, 255, 255, 0.12);
+    --hair-strong: rgba(255, 255, 255, 0.20);
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --fiat: #34d399;
+    --credit: #f59e0b;
+    --invest: #a9b2ff;
+    --crypto: #ffb37a;
+    --font-sans: 'Geist', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+  }
+
+  body {
+    background-color: #000000;
+    background-image:
+      radial-gradient(circle at 12% 5%, rgba(52, 211, 153, 0.05) 0%, transparent 45%),
+      radial-gradient(circle at 88% 12%, rgba(232, 255, 31, 0.04) 0%, transparent 45%),
+      radial-gradient(circle at 50% 60%, rgba(169, 178, 255, 0.03) 0%, transparent 55%);
+    color: #ffffff;
+    font-family: var(--font-sans);
+    letter-spacing: -0.02em;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.03em;
+  }
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+/* ==========================================================================
+   BENTO DESIGN SYSTEM: SURFACES, CARDS, SEGMENTS & CHIPS
+   ========================================================================== */
+
+/* Standard Bento Card: 28px radius, dark pitch surface, subtle glowing rim */
+.bento-card {
+  position: relative;
+  background: #000000;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 20px 48px -12px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.bento-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Glassy Bento Surface */
+.bento-glass {
+  background: rgba(14, 16, 20, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 16px 40px -12px rgba(0, 0, 0, 0.75);
+}
+
+/* Atmospheric Card: ICICI Forex Card (Obsidian with emerald-mint glow) */
+.icici-card-bg {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(52, 211, 153, 0.22) 0%, rgba(232, 255, 31, 0.06) 40%, transparent 70%),
+    linear-gradient(145deg, #0a0e0c 0%, #060907 60%, #000000 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(52, 211, 153, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(52, 211, 153, 0.12),
+    0 24px 50px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* Atmospheric Card: Axis Bank Card (Obsidian with warm champagne-amber glow) */
+.axis-card-bg {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(245, 158, 11, 0.22) 0%, rgba(232, 255, 31, 0.05) 40%, transparent 70%),
+    linear-gradient(145deg, #120e0a 0%, #0a0805 60%, #000000 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 1px rgba(245, 158, 11, 0.12),
+    0 24px 50px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* Atmospheric Card: Summary / Net Funds (Obsidian with lavender-violet & neon glow) */
+.funds-card-bg {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(169, 178, 255, 0.20) 0%, rgba(232, 255, 31, 0.08) 42%, transparent 72%),
+    linear-gradient(145deg, #0e0f18 0%, #080810 60%, #000000 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(169, 178, 255, 0.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.20),
+    inset 0 0 0 1px rgba(169, 178, 255, 0.10),
+    0 24px 50px -12px rgba(0, 0, 0, 0.9);
+}
+
+/* Panel surface replacement for consistent 28px bento cards */
+.panel-bg {
+  position: relative;
+  background: #000000;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 20px 48px -12px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+/* Bento Segmented Control (Pills with 14px outer radius, 11px inner buttons) */
+.bento-seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.bento-seg-btn {
+  border: 0;
+  height: 28px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--t2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.bento-seg-btn-active {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Bento Micro Chips */
+.bento-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.bento-chip-neon {
+  background: var(--acc-dim);
+  border-color: rgba(232, 255, 31, 0.35);
+  color: var(--acc);
+}
+
+.bento-chip-emerald {
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.3);
+  color: #34d399;
+}
+
+.bento-chip-amber {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+/* Bento Buttons */
+.bento-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--acc);
+  color: #000000;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 16px -2px rgba(232, 255, 31, 0.35);
+}
+
+.bento-btn-primary:hover {
+  background: var(--acc-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -2px rgba(232, 255, 31, 0.5);
+}
+
+.bento-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.bento-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Navigation & Sidebar Bento Styling */
+.sidebar-bg {
+  background-color: #000000;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-item-active {
+  background: #ffffff;
+  color: #000000 !important;
+  font-weight: 700;
+  box-shadow: 0 4px 18px rgba(255, 255, 255, 0.15);
+}
+
+.role-dad-active {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.32);
+}
+
+.role-son-active {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.32);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

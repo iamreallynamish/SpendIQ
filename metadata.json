@@ -1,0 +1,6 @@
+{
+  "name": "SpendIQ — Family Financial Dashboard",
+  "description": "Multi-currency family finance tracker for ICICI Forex and Axis Bank cards with smart SMS parsing, daily billing calendar, budget forecasting, and cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
