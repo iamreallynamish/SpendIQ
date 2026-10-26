@@ -28,5 +28,10 @@ service cloud.firestore {
       allow read: if isValidId(cardId);
       allow write: if isValidId(cardId);
     }
+
+    match /familyLedger/{ledgerId} {
+      allow read: if isValidId(ledgerId);
+      allow write: if isValidId(ledgerId);
+    }
   }
 }

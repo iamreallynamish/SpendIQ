@@ -53,55 +53,64 @@ export const FixedExpensesSection: React.FC = () => {
       </div>
 
       {/* Grid of Fixed Expense Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
-        {data.fixedExpenses.map((item) => (
-          <div
-            key={item.id}
-            className={`p-4 rounded-2xl bg-white/[0.03] border transition-all ${
-              item.active
-                ? 'border-white/10 hover:border-white/20'
-                : 'border-white/5 opacity-50 bg-black'
-            } flex flex-col justify-between gap-3`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="text-xs font-bold text-white leading-snug">{item.name}</div>
-                <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
-                  {item.due} • {item.card}
+      {data.fixedExpenses.length === 0 ? (
+        <div className="py-8 text-center space-y-2 border border-dashed border-white/10 rounded-2xl mt-4">
+          <div className="text-xs font-bold text-white">No fixed recurring expenses added</div>
+          <p className="text-[11px] text-zinc-400 max-w-sm mx-auto">
+            Click &ldquo;Add Item&rdquo; above to record rent, utilities, transit passes, or phone bills.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-4">
+          {data.fixedExpenses.map((item) => (
+            <div
+              key={item.id}
+              className={`p-4 rounded-2xl bg-white/[0.03] border transition-all ${
+                item.active
+                  ? 'border-white/10 hover:border-white/20'
+                  : 'border-white/5 opacity-50 bg-black'
+              } flex flex-col justify-between gap-3`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs font-bold text-white leading-snug">{item.name}</div>
+                  <div className="text-[10px] text-zinc-400 font-mono mt-0.5">
+                    {item.due} • {item.card}
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => toggleFixedExpense(item.id)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                    item.active
+                      ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                  }`}
+                >
+                  {item.active ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      <span>Active</span>
+                    </>
+                  ) : (
+                    <>
+                      <PauseCircle className="w-3 h-3 text-zinc-400" />
+                      <span>Paused</span>
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => toggleFixedExpense(item.id)}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
-                  item.active
-                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                }`}
-              >
-                {item.active ? (
-                  <>
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                    <span>Active</span>
-                  </>
-                ) : (
-                  <>
-                    <PauseCircle className="w-3 h-3 text-zinc-400" />
-                    <span>Paused</span>
-                  </>
-                )}
-              </button>
-            </div>
 
-            <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.06]">
-              <span className="text-[10px] uppercase text-zinc-500 font-medium font-mono">Monthly</span>
-              <span className="text-sm font-extrabold text-white font-mono-num">
-                {formatFromJpy(item.amountJpy, currency)}
-              </span>
+              <div className="flex items-center justify-between pt-2.5 border-t border-white/[0.06]">
+                <span className="text-[10px] uppercase text-zinc-500 font-medium font-mono">Monthly</span>
+                <span className="text-sm font-extrabold text-white font-mono-num">
+                  {formatFromJpy(item.amountJpy, currency)}
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -31,6 +31,14 @@
         "nextDate": { "type": "string", "maxLength": 30 },
         "lastSyncInfo": { "type": "string", "maxLength": 50 }
       }
+    },
+    "FamilyLedger": {
+      "title": "FamilyLedger",
+      "description": "Synchronized real-time family database ledger",
+      "type": "object",
+      "properties": {
+        "updatedAt": { "type": "number" }
+      }
     }
   },
   "firestore": {
@@ -41,6 +49,10 @@
     "/cards/{cardId}": {
       "schema": "CardState",
       "description": "Current state for ICICI and Axis cards"
+    },
+    "/familyLedger/{ledgerId}": {
+      "schema": "FamilyLedger",
+      "description": "Shared real-time family database document for multi-device sync"
     }
   }
 }

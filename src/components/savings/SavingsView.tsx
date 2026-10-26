@@ -200,33 +200,39 @@ export const SavingsView: React.FC = () => {
             <span className="text-zinc-500 font-mono text-[11px]">{data.stocks.length} assets</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {data.stocks.map((stock) => (
-              <div
-                key={stock.id}
-                className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 hover:border-white/15 transition-all"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="bento-chip font-mono text-[11px]">{stock.ticker}</span>
-                    <span className="text-xs font-bold text-white truncate max-w-[120px]">{stock.name}</span>
+          {data.stocks.length === 0 ? (
+            <div className="py-8 text-center text-zinc-500 font-mono text-xs border border-dashed border-white/10 rounded-2xl">
+              No equity or stock holdings recorded. Click &ldquo;Add Stock Holding&rdquo; above to record shares or ETFs.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {data.stocks.map((stock) => (
+                <div
+                  key={stock.id}
+                  className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between gap-3 hover:border-white/15 transition-all"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="bento-chip font-mono text-[11px]">{stock.ticker}</span>
+                      <span className="text-xs font-bold text-white truncate max-w-[120px]">{stock.name}</span>
+                    </div>
+                    <div className="text-[11px] text-zinc-400 font-mono mt-1">
+                      {stock.units} units
+                    </div>
                   </div>
-                  <div className="text-[11px] text-zinc-400 font-mono mt-1">
-                    {stock.units} units
-                  </div>
-                </div>
 
-                <div className="text-right">
-                  <div className="text-sm font-extrabold text-white font-mono-num">
-                    {formatFromJpy(stock.valueJpy, currency)}
+                  <div className="text-right">
+                    <div className="text-sm font-extrabold text-white font-mono-num">
+                      {formatFromJpy(stock.valueJpy, currency)}
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-400 font-mono">
+                      {stock.gain}
+                    </span>
                   </div>
-                  <span className="text-[10px] font-bold text-emerald-400 font-mono">
-                    {stock.gain}
-                  </span>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

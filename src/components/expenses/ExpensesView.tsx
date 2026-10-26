@@ -59,7 +59,20 @@ export const ExpensesView: React.FC = () => {
 
   const netSavedJpy = targetAllowance - iciciMonthSpend;
   const iciciAvail = data.icici.balanceJpy ?? 0;
-  const safeDailyBurn = Math.max(500, Math.round(iciciAvail / 12));
+
+  // Safe daily burn rate: dynamic based on available balance and days
+  const safeDailyBurn = useMemo(() => {
+    if (iciciAvail <= 0) return 0;
+    try {
+      const today = new Date();
+      const target = new Date(data.icici.nextDate);
+      const diffMs = target.getTime() - today.getTime();
+      const diffDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      return Math.round(iciciAvail / diffDays);
+    } catch {
+      return Math.round(iciciAvail / 30);
+    }
+  }, [iciciAvail, data.icici.nextDate]);
 
   return (
     <div className="space-y-6 pb-14">
@@ -108,11 +121,17 @@ export const ExpensesView: React.FC = () => {
             </span>
           </div>
 
-          {/* Recharts Pie Chart */}
+          {/* Recharts Pie Chart or Clean Empty State */}
           <div className="w-full h-64 my-4 flex items-center justify-center relative">
             {chartData.length === 0 ? (
-              <div className="text-xs text-zinc-500 text-center py-10 font-mono">
-                No transactions recorded in this period.
+              <div className="text-center space-y-2 py-8">
+                <div className="w-10 h-10 mx-auto rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-500">
+                  <PieIcon className="w-5 h-5" />
+                </div>
+                <div className="text-xs font-bold text-white">No expenses recorded</div>
+                <p className="text-[11px] text-zinc-400 max-w-[220px] mx-auto font-mono">
+                  Upload card swipes or SMS alerts to visualize category distribution.
+                </p>
               </div>
             ) : (
               <>
@@ -157,27 +176,33 @@ export const ExpensesView: React.FC = () => {
 
           {/* Custom Category Legend */}
           <div className="w-full space-y-2 max-h-56 overflow-y-auto pr-1">
-            {chartData.map((item, idx) => {
-              const color = COLORS[idx % COLORS.length];
-              const pct = totalSpendJpy > 0 ? Math.round((item.value / totalSpendJpy) * 100) : 0;
-              return (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between text-xs py-2 px-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]"
-                >
-                  <span className="flex items-center gap-2 text-zinc-200 font-medium">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
-                    <span className="truncate max-w-[150px]">{item.name}</span>
-                  </span>
-                  <span className="font-mono-num font-bold text-white shrink-0 ml-2">
-                    {formatFromJpy(item.value, currency)}{' '}
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 ml-1 font-mono">
-                      {pct}%
+            {chartData.length === 0 ? (
+              <div className="py-4 text-center text-xs text-zinc-500 font-mono">
+                No active categories yet
+              </div>
+            ) : (
+              chartData.map((item, idx) => {
+                const color = COLORS[idx % COLORS.length];
+                const pct = totalSpendJpy > 0 ? Math.round((item.value / totalSpendJpy) * 100) : 0;
+                return (
+                  <div
+                    key={item.name}
+                    className="flex items-center justify-between text-xs py-2 px-2.5 rounded-xl bg-white/[0.02] border border-white/[0.05]"
+                  >
+                    <span className="flex items-center gap-2 text-zinc-200 font-medium">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}></span>
+                      <span className="truncate max-w-[150px]">{item.name}</span>
                     </span>
-                  </span>
-                </div>
-              );
-            })}
+                    <span className="font-mono-num font-bold text-white shrink-0 ml-2">
+                      {formatFromJpy(item.value, currency)}{' '}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-zinc-300 ml-1 font-mono">
+                        {pct}%
+                      </span>
+                    </span>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -248,7 +273,9 @@ export const ExpensesView: React.FC = () => {
                 <div>
                   <div className="text-xs font-bold text-white">Daily Safe Conbini &amp; Dining Burn Rate</div>
                   <div className="text-[11px] text-zinc-400">
-                    Estimated pace until next reload date: <strong>{data.icici.nextDate}</strong>
+                    {iciciAvail > 0
+                      ? `Calculated pace until next reload date: ${data.icici.nextDate}`
+                      : 'Set available balance in Card Balances to activate run-rate'}
                   </div>
                 </div>
                 <div className="text-xl font-extrabold text-emerald-400 font-mono-num">

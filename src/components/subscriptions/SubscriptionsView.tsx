@@ -155,54 +155,74 @@ export const SubscriptionsView: React.FC = () => {
       )}
 
       {/* Subscriptions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {data.subscriptions.map((sub) => (
-          <div
-            key={sub.id}
-            className="bento-card p-5 flex flex-col justify-between gap-4 hover:border-white/20 transition-all group"
+      {data.subscriptions.length === 0 ? (
+        <div className="bento-card p-10 text-center space-y-3">
+          <div className="w-10 h-10 mx-auto rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div className="text-sm font-bold text-white">No active subscriptions</div>
+          <p className="text-xs text-zinc-400 max-w-sm mx-auto">
+            Track recurring software, streaming services, and memberships billed to your cards.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowAddForm(true)}
+            className="bento-btn-primary h-8 px-3 text-xs inline-flex items-center gap-1.5 mx-auto cursor-pointer"
           >
-            <div>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold text-white tracking-tight">{sub.name}</h3>
-                  <div className="text-[11px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5">
-                    <Calendar className="w-3 h-3 text-zinc-500" />
-                    <span>{sub.cycle}</span>
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Subscription</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.subscriptions.map((sub) => (
+            <div
+              key={sub.id}
+              className="bento-card p-5 flex flex-col justify-between gap-4 hover:border-white/20 transition-all group"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-white tracking-tight">{sub.name}</h3>
+                    <div className="text-[11px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 text-zinc-500" />
+                      <span>{sub.cycle}</span>
+                    </div>
+                  </div>
+                  <span className="bento-chip bento-chip-emerald font-mono text-[10px]">
+                    {sub.status || 'Active'}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex items-baseline justify-between">
+                  <span className="text-[10px] uppercase text-zinc-400 font-mono">Cost</span>
+                  <div className="text-xl font-extrabold text-white font-mono-num">
+                    {formatFromJpy(sub.amountJpy, currency)}
                   </div>
                 </div>
-                <span className="bento-chip bento-chip-emerald font-mono text-[10px]">
-                  {sub.status || 'Active'}
-                </span>
-              </div>
 
-              <div className="mt-4 flex items-baseline justify-between">
-                <span className="text-[10px] uppercase text-zinc-400 font-mono">Cost</span>
-                <div className="text-xl font-extrabold text-white font-mono-num">
-                  {formatFromJpy(sub.amountJpy, currency)}
+                <div className="mt-2 text-[10px] text-zinc-400 font-mono">
+                  Billed to: <strong className="text-zinc-200">{sub.card}</strong>
                 </div>
               </div>
 
-              <div className="mt-2 text-[10px] text-zinc-400 font-mono">
-                Billed to: <strong className="text-zinc-200">{sub.card}</strong>
+              <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs">
+                <span className="text-[10px] text-zinc-500 font-mono">Auto-renews monthly</span>
+                {role === 'DAD' && (
+                  <button
+                    type="button"
+                    onClick={() => deleteSubscription(sub.id)}
+                    title="Delete subscription"
+                    className="text-zinc-500 hover:text-rose-400 transition-colors p-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
-
-            <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs">
-              <span className="text-[10px] text-zinc-500 font-mono">Auto-renews monthly</span>
-              {role === 'DAD' && (
-                <button
-                  type="button"
-                  onClick={() => deleteSubscription(sub.id)}
-                  title="Delete subscription"
-                  className="text-zinc-500 hover:text-rose-400 transition-colors p-1 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

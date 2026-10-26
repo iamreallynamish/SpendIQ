@@ -4,19 +4,23 @@ import { formatFromJpy } from '../../utils/currency';
 import { ThreeMonthSpendSummaryCard } from './ThreeMonthSpendSummaryCard';
 import {
   BarChart3,
-  TrendingUp,
   Store,
   DollarSign,
-  Calendar,
-  Layers,
-  ArrowUpRight,
-  ShieldCheck,
   CreditCard,
 } from 'lucide-react';
 
 export const InsightsView: React.FC = () => {
-  const { data, currency, targetAllowance } = useFinance();
+  const { data, currency, targetAllowance, openModal } = useFinance();
   const [selectedMerchantCategory, setSelectedMerchantCategory] = useState<string>('ALL');
+
+  // Dynamic list of categories present in transactions
+  const categoriesPresent = useMemo(() => {
+    const set = new Set<string>();
+    data.transactions.forEach((t) => {
+      if (t.category) set.add(t.category);
+    });
+    return Array.from(set);
+  }, [data.transactions]);
 
   // Compute vendor frequency & total spent per merchant
   const merchantAnalytics = useMemo(() => {
@@ -49,7 +53,7 @@ export const InsightsView: React.FC = () => {
       .sort((a, b) => b.totalJpy - a.totalJpy);
   }, [data.transactions, selectedMerchantCategory]);
 
-  // Overall metrics across the 3 months
+  // Overall metrics across transactions
   const totalSpendAllTimeJpy = useMemo(() => {
     return data.transactions.reduce((acc, tx) => acc + (Number(tx.amountJpy) || 0), 0);
   }, [data.transactions]);
@@ -78,7 +82,7 @@ export const InsightsView: React.FC = () => {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400 mt-1">
-            Recharts category spending breakdown, merchant analytics, and currency velocity across August, September, and October 2026.
+            Category spending breakdown, merchant analytics, and currency velocity across your active ledgers.
           </p>
         </div>
 
@@ -107,64 +111,93 @@ export const InsightsView: React.FC = () => {
                     Merchant Outflow &amp; Frequency
                   </h3>
                   <p className="text-[11px] text-zinc-400">
-                    Highest volume vendors across Tokyo transit, conbini, and dining
+                    Highest volume merchants and visit frequencies across your card transactions
                   </p>
                 </div>
               </div>
 
-              {/* Category Filter */}
-              <select
-                value={selectedMerchantCategory}
-                onChange={(e) => setSelectedMerchantCategory(e.target.value)}
-                className="bg-black text-[11px] font-mono font-semibold text-zinc-300 border border-white/10 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
-              >
-                <option value="ALL">All Categories</option>
-                <option value="Convenience Store">Convenience Store</option>
-                <option value="Food & Dining">Food &amp; Dining</option>
-                <option value="Travel & Transit">Travel &amp; Transit</option>
-                <option value="Clothing & Apparel">Clothing &amp; Apparel</option>
-                <option value="Education & Dorm">Education &amp; Dorm</option>
-              </select>
+              {/* Dynamic Category Filter */}
+              {categoriesPresent.length > 0 && (
+                <select
+                  value={selectedMerchantCategory}
+                  onChange={(e) => setSelectedMerchantCategory(e.target.value)}
+                  className="bg-black text-[11px] font-mono font-semibold text-zinc-300 border border-white/10 rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">All Categories</option>
+                  {categoriesPresent.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            {/* Merchant Rows */}
-            <div className="space-y-2.5 mt-4">
-              {merchantAnalytics.slice(0, 5).map((m, idx) => {
-                const pct = totalSpendAllTimeJpy > 0 ? Math.round((m.totalJpy / totalSpendAllTimeJpy) * 100) : 0;
-                return (
-                  <div
-                    key={m.name}
-                    className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between gap-3 hover:bg-white/[0.05] transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-[11px] font-bold text-zinc-300 font-mono">
-                        #{idx + 1}
-                      </span>
-                      <div className="truncate">
-                        <div className="text-xs font-bold text-white truncate">{m.name}</div>
-                        <div className="text-[10px] text-zinc-400 font-mono">
-                          {m.category} • {m.count} visits
+            {/* Merchant Rows or Clean Blank State */}
+            {merchantAnalytics.length === 0 ? (
+              <div className="py-12 text-center space-y-3">
+                <div className="w-10 h-10 mx-auto rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-500">
+                  <Store className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-white">No merchant outflow recorded</div>
+                  <p className="text-[11px] text-zinc-400 max-w-xs mx-auto mt-0.5">
+                    Start adding transactions or parse SMS receipts to view top vendor volume, visit counts, and category breakdowns.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openModal('smsModal')}
+                  className="bento-btn-primary h-7 px-3 text-[11px] inline-flex items-center gap-1.5 mx-auto cursor-pointer"
+                >
+                  <span>+ Add Transactions</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5 mt-4">
+                {merchantAnalytics.slice(0, 5).map((m, idx) => {
+                  const pct = totalSpendAllTimeJpy > 0 ? Math.round((m.totalJpy / totalSpendAllTimeJpy) * 100) : 0;
+                  return (
+                    <div
+                      key={m.name}
+                      className="p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-center justify-between gap-3 hover:bg-white/[0.05] transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-white/10 flex items-center justify-center text-[11px] font-bold text-zinc-300 font-mono">
+                          #{idx + 1}
+                        </span>
+                        <div className="truncate">
+                          <div className="text-xs font-bold text-white truncate">{m.name}</div>
+                          <div className="text-[10px] text-zinc-400 font-mono">
+                            {m.category} • {m.count} {m.count === 1 ? 'visit' : 'visits'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="text-xs sm:text-sm font-bold text-white font-mono-num">
+                          {formatFromJpy(m.totalJpy, currency)}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 font-mono-num">
+                          {pct}% total volume
                         </div>
                       </div>
                     </div>
-
-                    <div className="text-right shrink-0">
-                      <div className="text-xs sm:text-sm font-bold text-white font-mono-num">
-                        {formatFromJpy(m.totalJpy, currency)}
-                      </div>
-                      <div className="text-[10px] text-zinc-400 font-mono-num">
-                        {pct}% total volume
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="pt-3.5 mt-4 border-t border-white/[0.08] flex items-center justify-between text-xs text-zinc-400 font-mono">
-            <span>Tracking {merchantAnalytics.length} unique merchants</span>
-            <span className="text-[#E8FF1F]">Live ledger match</span>
+            <span>
+              {merchantAnalytics.length === 0
+                ? '0 merchants tracked'
+                : `Tracking ${merchantAnalytics.length} unique ${merchantAnalytics.length === 1 ? 'merchant' : 'merchants'}`}
+            </span>
+            <span className={merchantAnalytics.length > 0 ? 'text-[#E8FF1F]' : 'text-zinc-500'}>
+              {merchantAnalytics.length > 0 ? 'Live ledger match' : 'Awaiting data'}
+            </span>
           </div>
         </div>
 
@@ -185,53 +218,66 @@ export const InsightsView: React.FC = () => {
               </div>
             </div>
 
-            {/* Split Bar */}
-            <div className="mt-5 space-y-4">
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-semibold text-emerald-400">ICICI Forex XX0817 ({iciciShare}%)</span>
-                  <span className="font-semibold text-amber-400">Axis Credit XX7117 ({100 - iciciShare}%)</span>
+            {totalSpendAllTimeJpy === 0 ? (
+              <div className="py-12 text-center space-y-3">
+                <div className="w-10 h-10 mx-auto rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-500">
+                  <CreditCard className="w-5 h-5" />
                 </div>
-                <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden flex">
-                  <div
-                    className="bg-emerald-400 h-full transition-all duration-500"
-                    style={{ width: `${iciciShare}%` }}
-                  />
-                  <div
-                    className="bg-amber-400 h-full transition-all duration-500"
-                    style={{ width: `${100 - iciciShare}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Conversion Preview Matrix */}
-              <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  Real-time Reference Pegs
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                  <div className="p-2 rounded-xl bg-black border border-white/10">
-                    <div className="text-[10px] text-zinc-400">100 JPY ≈</div>
-                    <div className="text-white font-bold font-mono-num">₹56.00 INR</div>
-                  </div>
-                  <div className="p-2 rounded-xl bg-black border border-white/10">
-                    <div className="text-[10px] text-zinc-400">1 USD ≈</div>
-                    <div className="text-white font-bold font-mono-num">¥150 JPY</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Allowance Health Indicator */}
-              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-white">Target Allowance Pace</div>
-                  <div className="text-[11px] text-zinc-300">¥{targetAllowance}/day cap for daily variable spend</div>
+                  <div className="text-xs font-bold text-white">No card spending recorded</div>
+                  <p className="text-[11px] text-zinc-400 max-w-xs mx-auto mt-0.5">
+                    As you record transactions on ICICI Forex or Axis Bank, spending volume and distribution will appear here.
+                  </p>
                 </div>
-                <span className="bento-chip bento-chip-emerald font-mono">
-                  Healthy
-                </span>
               </div>
-            </div>
+            ) : (
+              <div className="mt-5 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1.5">
+                    <span className="font-semibold text-emerald-400">ICICI Forex XX0817 ({iciciShare}%)</span>
+                    <span className="font-semibold text-amber-400">Axis Credit XX7117 ({100 - iciciShare}%)</span>
+                  </div>
+                  <div className="w-full h-3 rounded-full bg-white/10 overflow-hidden flex">
+                    <div
+                      className="bg-emerald-400 h-full transition-all duration-500"
+                      style={{ width: `${iciciShare}%` }}
+                    />
+                    <div
+                      className="bg-amber-400 h-full transition-all duration-500"
+                      style={{ width: `${100 - iciciShare}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Conversion Preview Matrix */}
+                <div className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/[0.06] space-y-2">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Real-time Reference Pegs
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                    <div className="p-2 rounded-xl bg-black border border-white/10">
+                      <div className="text-[10px] text-zinc-400">100 JPY ≈</div>
+                      <div className="text-white font-bold font-mono-num">₹56.00 INR</div>
+                    </div>
+                    <div className="p-2 rounded-xl bg-black border border-white/10">
+                      <div className="text-[10px] text-zinc-400">1 USD ≈</div>
+                      <div className="text-white font-bold font-mono-num">¥150 JPY</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Allowance Target Pace */}
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-white">Target Allowance Pace</div>
+                    <div className="text-[11px] text-zinc-300">¥{targetAllowance.toLocaleString()}/day cap for daily variable spend</div>
+                  </div>
+                  <span className="bento-chip bento-chip-emerald font-mono">
+                    Active
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="pt-3.5 mt-4 border-t border-white/[0.08] flex items-center justify-between text-xs text-zinc-400">

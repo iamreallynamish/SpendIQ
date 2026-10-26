@@ -29,7 +29,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export const ThreeMonthSpendSummaryCard: React.FC = () => {
-  const { data, currency } = useFinance();
+  const { data, currency, openModal } = useFinance();
   const [chartMode, setChartMode] = useState<'stacked' | 'grouped'>('stacked');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
 
@@ -111,6 +111,47 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
 
   // Unique categories
   const activeCategories = categorySummary.map((c) => c.category);
+
+  if (data.transactions.length === 0) {
+    return (
+      <div className="bento-card p-6 sm:p-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/[0.08]">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+              <span className="bento-chip">Quarterly Intelligence</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mt-1.5 flex items-center gap-2">
+              <span>Quarterly Category Spending Breakdown</span>
+              <Sparkles className="w-4 h-4 text-[#E8FF1F]" />
+            </h2>
+            <p className="text-xs text-zinc-400 mt-1 max-w-2xl">
+              Multi-month trend analysis across Japan &amp; India card ledgers, highlighting category drift, surge velocity, and recurring commitments.
+            </p>
+          </div>
+        </div>
+
+        <div className="py-12 px-4 max-w-md mx-auto text-center space-y-4">
+          <div className="w-12 h-12 mx-auto rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-zinc-400">
+            <Layers className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">No transactions recorded yet</h3>
+            <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+              Your 3-month Recharts category breakdown and velocity trends will populate automatically as soon as you add your first transactions or paste bank SMS alerts.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openModal('smsModal')}
+            className="bento-btn-primary h-9 px-4 text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
+          >
+            <span>+ Add Transactions / SMS</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bento-card p-6 sm:p-7 space-y-6">

@@ -280,11 +280,18 @@ export const NextMonthView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.05] text-xs">
-              {data.nextMonthPlan.map((item) => (
-                <tr
-                  key={item.id}
-                  className={`hover:bg-white/[0.02] transition-colors ${item.included ? '' : 'opacity-40'}`}
-                >
+              {data.nextMonthPlan.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-zinc-500 text-xs font-mono">
+                    No planned expenses added for next month yet. Use the form above to add upcoming expenses or click &ldquo;Import Fixed&rdquo; to pull recurring costs.
+                  </td>
+                </tr>
+              ) : (
+                data.nextMonthPlan.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-white/[0.02] transition-colors ${item.included ? '' : 'opacity-40'}`}
+                  >
                   <td className="py-3.5 pr-4">
                     <div className="font-bold text-white text-xs">{item.name}</div>
                   </td>
@@ -326,7 +333,7 @@ export const NextMonthView: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
