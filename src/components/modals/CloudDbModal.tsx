@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { X, Copy, Download, Upload, Database, Trash2, CheckCircle2 } from 'lucide-react';
+import { X, Copy, Download, Upload, Database, Trash2, CheckCircle2, RotateCcw, Sparkles } from 'lucide-react';
 import firebaseConfig from '../../../firebase-applet-config.json';
 
 export const CloudDbModal: React.FC = () => {
@@ -11,6 +11,7 @@ export const CloudDbModal: React.FC = () => {
     pullFromCloud,
     exportSyncCode,
     importSyncCode,
+    restoreOriginalTransactions,
     wipeToBlankSlate,
     showToast,
     isCloudSyncing,
@@ -116,7 +117,34 @@ export const CloudDbModal: React.FC = () => {
           </div>
         </div>
 
-        {/* 2. Blank Slate Manager */}
+        {/* 2. Restore Master Transactions */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/30 to-zinc-900 border border-emerald-500/20 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs font-bold text-white">Restore All Original Transactions</span>
+            </div>
+            <span className="bento-chip bento-chip-emerald font-mono text-[10px]">
+              Master History
+            </span>
+          </div>
+          <p className="text-[11px] text-zinc-300 leading-relaxed">
+            Reload the full authentic ledger (October &amp; November transactions, 7-Eleven, Lawson, Suica, MaxValu, GU Nagoya, Seven Bank ATM, Bic Camera, cards and fixed commitments) and sync immediately to Google Cloud Firestore.
+          </p>
+          <button
+            type="button"
+            onClick={async () => {
+              await restoreOriginalTransactions();
+            }}
+            disabled={isCloudSyncing}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#E8FF1F] hover:bg-[#d6ec13] text-black shadow-md transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-black" />
+            <span>Return All Transactions Back</span>
+          </button>
+        </div>
+
+        {/* 3. Blank Slate Manager */}
         <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

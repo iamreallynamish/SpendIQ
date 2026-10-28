@@ -94,6 +94,7 @@ interface FinanceContextType {
   exportSyncCode: () => string;
   importSyncCode: (base64Str: string) => boolean;
   resetToDefault: () => void;
+  restoreOriginalTransactions: () => Promise<void>;
   wipeToBlankSlate: () => Promise<void>;
 }
 
@@ -102,15 +103,13 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 function deduplicateTransactions(txs: Transaction[]): Transaction[] {
   if (!Array.isArray(txs)) return [];
   const seenIds = new Set<string>();
-  const seenFp = new Set<string>();
   const res: Transaction[] = [];
   for (const t of txs) {
     if (!t) continue;
-    if (t.id && seenIds.has(t.id)) continue;
-    if (t.id) seenIds.add(t.id);
-    const fp = `${(t.merchant || '').toUpperCase()}|${t.date || ''}|${Number(t.amountJpy) || 0}|${t.cardCode || ''}|${t.smsBalance ?? ''}`;
-    if (seenFp.has(fp)) continue;
-    seenFp.add(fp);
+    if (t.id) {
+      if (seenIds.has(t.id)) continue;
+      seenIds.add(t.id);
+    }
     res.push(t);
   }
   return res;
@@ -141,13 +140,24 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Prevent local write loops
   const isUpdatingFromRemoteRef = useRef<boolean>(false);
 
-  // Initialize Core Data from fresh blank slate or local v4 storage
+  // Initialize Core Data from fresh storage or master data
   const [data, setData] = useState<FamilyDatabasePayload>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed.transactions)) {
+      const savedV5 = localStorage.getItem('spendiq_family_db_v5');
+      if (savedV5) {
+        const parsed = JSON.parse(savedV5);
+        if (parsed && Array.isArray(parsed.transactions) && parsed.transactions.length > 0) {
+          return {
+            ...INITIAL_DATA,
+            ...parsed,
+            transactions: deduplicateTransactions(parsed.transactions),
+          };
+        }
+      }
+      const savedV4 = localStorage.getItem(STORAGE_KEY);
+      if (savedV4) {
+        const parsed = JSON.parse(savedV4);
+        if (parsed && Array.isArray(parsed.transactions) && parsed.transactions.length > 0) {
           return {
             ...INITIAL_DATA,
             ...parsed,
@@ -160,6 +170,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
     return INITIAL_DATA;
   });
+
+  const localDataRef = useRef<FamilyDatabasePayload>(data);
+  useEffect(() => {
+    localDataRef.current = data;
+  }, [data]);
+
+  const selectedMonthRef = useRef<string>(selectedMonth);
+  useEffect(() => {
+    selectedMonthRef.current = selectedMonth;
+  }, [selectedMonth]);
 
   const showToast = useCallback((msg: string) => {
     if (toastTimer) window.clearTimeout(toastTimer);
@@ -181,6 +201,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Persist locally
   const saveLocally = useCallback((newData: FamilyDatabasePayload) => {
     try {
+      localStorage.setItem('spendiq_family_db_v5', JSON.stringify(newData));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
     } catch {
       // ignore
@@ -224,19 +245,36 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (snapshot.exists()) {
               const remote = snapshot.data() as FamilyDatabasePayload;
               if (remote && Array.isArray(remote.transactions)) {
-                const mappedTxs = deduplicateTransactions(remote.transactions);
+                const currentLocal = localDataRef.current;
+
+                // Protect against remote wiping out local data:
+                // If remote is empty but local has transactions, push local to Firestore!
+                if (remote.transactions.length === 0 && currentLocal.transactions.length > 0) {
+                  setDoc(ledgerDocRef, currentLocal).catch(console.warn);
+                  setIsFirestoreConnected(true);
+                  setDbStatusMsg(`Firestore Live (${currentLocal.transactions.length} Tx)`);
+                  return;
+                }
+
+                // If remote has data, merge safely preserving any local transactions that aren't yet in remote
+                const remoteIds = new Set(remote.transactions.map((t) => t.id));
+                const pendingLocalTxs = currentLocal.transactions.filter(
+                  (t) => !remoteIds.has(t.id) && t.manualOverride
+                );
+                const combinedTxs = deduplicateTransactions([...pendingLocalTxs, ...remote.transactions]);
+
                 isUpdatingFromRemoteRef.current = true;
                 setData((current) => {
                   const { icici, axis } = recalculateCardBalances(
-                    mappedTxs,
-                    selectedMonth,
+                    combinedTxs,
+                    selectedMonthRef.current || 'Oct-2026',
                     remote.icici || current.icici,
                     remote.axis || current.axis
                   );
                   const merged: FamilyDatabasePayload = {
                     ...INITIAL_DATA,
                     ...remote,
-                    transactions: mappedTxs,
+                    transactions: combinedTxs,
                     icici,
                     axis,
                   };
@@ -244,17 +282,18 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                   return merged;
                 });
                 setIsFirestoreConnected(true);
-                setDbStatusMsg(`Firestore Live (${mappedTxs.length} Tx)`);
+                setDbStatusMsg(`Firestore Live (${combinedTxs.length} Tx)`);
                 setTimeout(() => {
                   isUpdatingFromRemoteRef.current = false;
                 }, 100);
               }
             } else {
-              // First time: initialize document with clean blank slate in Firestore
-              setDoc(ledgerDocRef, INITIAL_DATA)
+              // First time: initialize document with current local data in Firestore
+              const payloadToInit = localDataRef.current.transactions.length > 0 ? localDataRef.current : INITIAL_DATA;
+              setDoc(ledgerDocRef, payloadToInit)
                 .then(() => {
                   setIsFirestoreConnected(true);
-                  setDbStatusMsg('Firestore Connected (Blank Slate)');
+                  setDbStatusMsg(`Firestore Connected (${payloadToInit.transactions.length} Tx)`);
                 })
                 .catch((err) => {
                   handleFirestoreError(err, OperationType.WRITE, 'familyLedger/current');
@@ -279,7 +318,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => {
       if (unsub) unsub();
     };
-  }, [selectedMonth, saveLocally]);
+  }, [saveLocally]);
 
   const openCategoryInspector = useCallback((cat: string) => {
     setInspectingCategory(cat);
@@ -458,60 +497,59 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     }
 
-    setData((prev) => {
-      const newTxs = [...prev.transactions];
-      const newNotes = { ...prev.calendarNotes };
+    const current = localDataRef.current;
+    const newTxs = [...current.transactions];
+    const newNotes = { ...current.calendarNotes };
 
-      staged.forEach((item, i) => {
-        const iconBg = colors[(newTxs.length + i) % colors.length];
-        const newTx: Transaction = {
-          id: 'tx-' + Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2, 6),
-          merchant: item.merchant,
-          letter: item.merchant.charAt(0) || 'S',
-          iconBg,
-          subtext: `${item.cardCode === 'AXIS' ? 'Axis Bank Card XX7117' : 'ICICI Bank Forex Prepaid Card XX0817'} • ${item.date}`,
-          category: item.category,
-          cardCode: item.cardCode,
-          cardUsed: item.cardUsed,
-          spender: item.spender,
-          date: item.date,
-          timestampMs: item.timestampMs,
-          amountJpy: Number(item.amountJpy) || 0,
-          amountInr: Number(item.amountInr) || Math.round((Number(item.amountJpy) || 0) / 1.8),
-          smsBalance: item.smsBalance !== null && item.smsBalance !== undefined ? Number(item.smsBalance) : null,
-          manualOverride: true,
-        };
-        newTxs.push(newTx);
-
-        const dayNumMatch = item.date.match(/^(\d{1,2})/);
-        if (dayNumMatch) {
-          const dayNum = String(parseInt(dayNumMatch[1], 10));
-          newNotes[dayNum] = {
-            title: `${item.merchant.slice(0, 10)} ¥${Number(item.amountJpy).toLocaleString('en-US')}`,
-            type: 'spend',
-          };
-        }
-      });
-
-      const deduplicated = deduplicateTransactions(newTxs).sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
-      const { icici, axis } = recalculateCardBalances(deduplicated, targetMonth, prev.icici, prev.axis);
-
-      const nextState: FamilyDatabasePayload = {
-        ...prev,
-        transactions: deduplicated,
-        calendarNotes: newNotes,
-        icici,
-        axis,
-        updatedAt: Date.now(),
+    staged.forEach((item, i) => {
+      const iconBg = colors[(newTxs.length + i) % colors.length];
+      const newTx: Transaction = {
+        id: 'tx-' + Date.now() + '-' + i + '-' + Math.random().toString(36).slice(2, 6),
+        merchant: item.merchant,
+        letter: item.merchant === '7-ELEVEN' ? '7' : (item.merchant.charAt(0) || 'S'),
+        iconBg,
+        subtext: `${item.cardCode === 'AXIS' ? 'Axis Bank Card XX7117' : 'ICICI Bank Forex Prepaid Card XX0817'} • ${item.date}`,
+        category: item.category,
+        cardCode: item.cardCode,
+        cardUsed: item.cardUsed,
+        spender: item.spender,
+        date: item.date,
+        timestampMs: item.timestampMs,
+        amountJpy: Number(item.amountJpy) || 0,
+        amountInr: Number(item.amountInr) || Math.round((Number(item.amountJpy) || 0) / 1.8),
+        smsBalance: item.smsBalance !== null && item.smsBalance !== undefined ? Number(item.smsBalance) : null,
+        manualOverride: true,
       };
+      newTxs.push(newTx);
 
-      saveLocally(nextState);
-      syncToFirestore(nextState);
-      return nextState;
+      const dayNumMatch = item.date.match(/^(\d{1,2})/);
+      if (dayNumMatch) {
+        const dayNum = String(parseInt(dayNumMatch[1], 10));
+        newNotes[dayNum] = {
+          title: `${item.merchant.slice(0, 10)} ¥${Number(item.amountJpy).toLocaleString('en-US')}`,
+          type: 'spend',
+        };
+      }
     });
 
+    const deduplicated = deduplicateTransactions(newTxs).sort((a, b) => (b.timestampMs || 0) - (a.timestampMs || 0));
+    const { icici, axis } = recalculateCardBalances(deduplicated, targetMonth, current.icici, current.axis);
+
+    const nextState: FamilyDatabasePayload = {
+      ...current,
+      transactions: deduplicated,
+      calendarNotes: newNotes,
+      icici,
+      axis,
+      updatedAt: Date.now(),
+    };
+
+    setData(nextState);
+    saveLocally(nextState);
+    syncToFirestore(nextState);
+    showToast(`Added ${staged.length} new transactions! Saved and synced to Cloud.`);
     return staged.length;
-  }, [selectedMonth, saveLocally, syncToFirestore]);
+  }, [selectedMonth, saveLocally, syncToFirestore, showToast]);
 
   const updateTransaction = useCallback((id: string, updated: Partial<Transaction>) => {
     setData((prev) => {
@@ -911,14 +949,39 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     setData(INITIAL_DATA);
     saveLocally(INITIAL_DATA);
     syncToFirestore(INITIAL_DATA);
-    showToast('Reset to clean blank slate');
+    showToast(`Restored ${INITIAL_DATA.transactions.length} master transactions & cards!`);
   }, [saveLocally, syncToFirestore, showToast]);
 
-  const wipeToBlankSlate = useCallback(async () => {
+  const restoreOriginalTransactions = useCallback(async () => {
     setData(INITIAL_DATA);
     saveLocally(INITIAL_DATA);
     await syncToFirestore(INITIAL_DATA);
-    showToast('Wiped database to a pristine blank slate!');
+    showToast(`Successfully returned all ${INITIAL_DATA.transactions.length} transactions back!`);
+  }, [saveLocally, syncToFirestore, showToast]);
+
+  const wipeToBlankSlate = useCallback(async () => {
+    const blank: FamilyDatabasePayload = {
+      ...INITIAL_DATA,
+      transactions: [],
+      calendarNotes: {},
+      updatedAt: Date.now(),
+      icici: {
+        ...INITIAL_DATA.icici,
+        balanceJpy: 0,
+        spentJpy: 0,
+        lastSyncInfo: 'Blank slate',
+      },
+      axis: {
+        ...INITIAL_DATA.axis,
+        balanceInr: 0,
+        spentInr: 0,
+        lastSyncInfo: 'Blank slate',
+      },
+    };
+    setData(blank);
+    saveLocally(blank);
+    await syncToFirestore(blank);
+    showToast('Wiped transactions to a blank slate!');
   }, [saveLocally, syncToFirestore, showToast]);
 
   return (
@@ -987,6 +1050,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         exportSyncCode,
         importSyncCode,
         resetToDefault,
+        restoreOriginalTransactions,
         wipeToBlankSlate,
       }}
     >

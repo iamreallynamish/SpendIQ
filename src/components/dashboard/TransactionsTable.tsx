@@ -2,7 +2,7 @@ import React from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { formatFromJpy } from '../../utils/currency';
 import { getCategoryBadgeStyle, getTxMonthKey } from '../../utils/smsParser';
-import { ReceiptText, Sparkles, Edit2, Trash2, ArrowUpDown, Filter, X, Camera, Receipt, ShoppingBag } from 'lucide-react';
+import { ReceiptText, Sparkles, Edit2, Trash2, ArrowUpDown, Filter, X, Camera, Receipt, ShoppingBag, RotateCcw } from 'lucide-react';
 import { Transaction } from '../../types/finance';
 
 export const TransactionsTable: React.FC = () => {
@@ -22,6 +22,7 @@ export const TransactionsTable: React.FC = () => {
     openCategoryInspector,
     openReceiptScannerForTx,
     openReceiptDetailForTx,
+    restoreOriginalTransactions,
   } = useFinance();
 
   // Dynamic categories present in transactions
@@ -161,7 +162,31 @@ export const TransactionsTable: React.FC = () => {
             {filteredTxs.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-12 text-center text-zinc-500 text-xs">
-                  No transactions recorded for this filter. Use &ldquo;Parse SMS Batch&rdquo; to add SMS receipts.
+                  <div className="max-w-md mx-auto space-y-3">
+                    <p className="text-zinc-400">
+                      No transactions found for the current month / filter.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await restoreOriginalTransactions();
+                        }}
+                        className="bento-btn-primary px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5 shadow-md cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-black" />
+                        <span>Return All Transactions Back</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openModal('smsModal')}
+                        className="bento-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <ReceiptText className="w-3.5 h-3.5" />
+                        <span>Upload / Parse SMS</span>
+                      </button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             ) : (
