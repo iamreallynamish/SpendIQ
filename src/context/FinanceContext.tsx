@@ -259,7 +259,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                 // If remote has data, merge safely preserving any local transactions that aren't yet in remote
                 const remoteIds = new Set(remote.transactions.map((t) => t.id));
                 const pendingLocalTxs = currentLocal.transactions.filter(
-                  (t) => !remoteIds.has(t.id) && t.manualOverride
+                  (t) => !remoteIds.has(t.id)
                 );
                 const combinedTxs = deduplicateTransactions([...pendingLocalTxs, ...remote.transactions]);
 

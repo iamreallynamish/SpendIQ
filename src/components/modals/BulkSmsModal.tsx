@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { StagedSmsItem, CardCode, Transaction } from '../../types/finance';
-import { parseSingleSmsLine, extractSmsDate, smartCategorizeExpense } from '../../utils/smsParser';
+import { parseSingleSmsLine, extractSmsDate, smartCategorizeExpense, normalizeMerchantName, isSevenElevenMerchant } from '../../utils/smsParser';
 import { CATEGORY_LIST } from '../../constants/initialData';
 import { X, Sparkles } from 'lucide-react';
 
@@ -22,27 +22,38 @@ export const BulkSmsModal: React.FC = () => {
   const [manualMerchant, setManualMerchant] = useState('');
   const [manualCard, setManualCard] = useState<CardCode>('ICICI');
   const [manualCategory, setManualCategory] = useState('');
-  const [manualDate, setManualDate] = useState('2026-10-24');
+  const [manualDate, setManualDate] = useState('2026-10-28');
   const [manualAmount, setManualAmount] = useState('');
   const [manualBal, setManualBal] = useState('');
 
   // Auto-parse lines whenever smsText or manual inputs change
   useEffect(() => {
     const lines = smsText.trim() ? smsText.split(/\n+/).map((l) => l.trim()).filter(Boolean) : [];
-    const parsed = lines.map((line, idx) => parseSingleSmsLine(line, idx + 1));
+    const parsed: StagedSmsItem[] = [];
+    lines.forEach((line, idx) => {
+      const item = parseSingleSmsLine(line, idx + 1);
+      if (item && (item.amountJpy > 0 || item.amountInr > 0)) {
+        parsed.push(item);
+      }
+    });
 
     if (manualMerchant.trim() && Number(manualAmount) > 0) {
       const amt = Number(manualAmount);
       const dInfo = extractSmsDate(manualDate);
+      const isSeven = isSevenElevenMerchant(manualMerchant);
+      const hasSuica = /suica/i.test(manualMerchant);
+      const normM = normalizeMerchantName(manualMerchant.trim());
+      const cat = manualCategory.trim() || smartCategorizeExpense(normM, manualMerchant);
+
       parsed.push({
-        merchant: manualMerchant.trim().toUpperCase(),
+        merchant: normM,
         cardCode: manualCard,
         cardUsed: manualCard === 'AXIS' ? 'Axis Bank XX7117' : 'ICICI Forex XX0817',
-        category: manualCategory.trim() || smartCategorizeExpense(manualMerchant.trim(), ''),
-        spender: role === 'DAD' ? 'Dad' : 'Son',
+        category: cat,
+        spender: isSeven || hasSuica ? 'Son' : role === 'DAD' ? 'Dad' : 'Son',
         date: dInfo.dateStr,
         dateRecognized: true,
-        timestampMs: dInfo.timestampMs + 99,
+        timestampMs: Date.now() + 100,
         amountJpy: manualCard === 'AXIS' ? Math.round(amt * 1.8) : amt,
         amountInr: manualCard === 'AXIS' ? amt : Math.round(amt / 1.8),
         nativeCurrency: manualCard === 'AXIS' ? 'INR' : 'JPY',
