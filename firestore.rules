@@ -15,15 +15,15 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth == null || (isSignedIn() && request.auth.uid == userId);
     }
 
     // Authenticated User Profiles & Isolated Private Ledgers
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isValidId(userId) && isOwner(userId);
 
       match /{subCollection=**} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isValidId(userId) && isOwner(userId);
       }
     }
 

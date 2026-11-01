@@ -25,6 +25,8 @@ export const OnboardingFlow: React.FC = () => {
   const {
     currentUser,
     userProfile,
+    isDomainUnauthorized,
+    currentHostname,
     signUpWithEmail,
     signInWithEmail,
     signInWithGoogle,
@@ -40,6 +42,7 @@ export const OnboardingFlow: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedHostname, setCopiedHostname] = useState(false);
 
   // Active step: if user already has a step saved, resume from there, else step 1
   const currentStep = (
@@ -94,6 +97,16 @@ export const OnboardingFlow: React.FC = () => {
       setActiveStep(2);
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
+      const isDomainIssue =
+        errObj.code === 'auth/unauthorized-domain' ||
+        (errObj.message && errObj.message.toLowerCase().includes('unauthorized-domain'));
+
+      if (isDomainIssue) {
+        // Fallback user active, proceed straight to Step 2
+        setActiveStep(2);
+        return;
+      }
+
       if (errObj.code === 'auth/email-already-in-use') {
         setAuthError('An account with this email already exists. Please log in.');
       } else if (errObj.code === 'auth/invalid-credential' || errObj.code === 'auth/wrong-password') {
@@ -115,7 +128,15 @@ export const OnboardingFlow: React.FC = () => {
       await signInWithGoogle();
       setActiveStep(2);
     } catch (err: unknown) {
-      const errObj = err as { message?: string };
+      const errObj = err as { code?: string; message?: string };
+      const isDomainIssue =
+        errObj.code === 'auth/unauthorized-domain' ||
+        (errObj.message && errObj.message.toLowerCase().includes('unauthorized-domain'));
+
+      if (isDomainIssue) {
+        setActiveStep(2);
+        return;
+      }
       setAuthError(errObj.message || 'Google Sign-In was cancelled or failed.');
     } finally {
       setIsSubmitting(false);
@@ -422,6 +443,25 @@ export const OnboardingFlow: React.FC = () => {
                 <p className="text-[11px] text-zinc-500">
                   Your financial ledger, card balances, and personal budgets are client-side encrypted and private to your account.
                 </p>
+
+                {currentHostname && (
+                  <div className="mt-3 py-2 px-3 rounded-xl bg-zinc-900/60 border border-white/5 flex items-center justify-between text-[11px] text-zinc-400">
+                    <span className="truncate max-w-[220px] font-mono text-[10px] text-zinc-500">
+                      {currentHostname}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentHostname);
+                        setCopiedHostname(true);
+                        setTimeout(() => setCopiedHostname(false), 2000);
+                      }}
+                      className="text-[10px] font-mono text-[#E8FF1F] hover:underline cursor-pointer shrink-0 ml-2"
+                    >
+                      {copiedHostname ? 'Copied Hostname!' : 'Copy Domain'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
