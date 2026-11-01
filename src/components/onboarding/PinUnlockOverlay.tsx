@@ -33,7 +33,7 @@ export const PinUnlockOverlay: React.FC = () => {
   const displayName = userProfile?.displayName || 'Namish';
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-between p-6 sm:p-10 select-none animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-6 sm:p-10 select-none animate-fade-in">
       {/* Top Header */}
       <div className="w-full max-w-sm flex items-center justify-between">
         <div className="flex items-center gap-2.5">

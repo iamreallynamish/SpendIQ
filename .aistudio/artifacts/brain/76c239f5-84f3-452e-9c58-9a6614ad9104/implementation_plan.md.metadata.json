@@ -1,6 +1,6 @@
 {
-  "summary":  "Comprehensive implementation plan for the complete onboarding and authentication system in SpendIQ, featuring a minimal dark aesthetic inspired by the reference, Firebase Email/Password & Google Sign-In, 4-digit numeric PIN lockpad, personal profile setup, banking preferences, and returning user session routing.",
-  "updatedAt":  "2026-11-01T03:10:48.933918262Z",
+  "summary":  "Implementation plan to fix Google Sign-In popup bypass, eliminate redundant profile setup screens for existing accounts, and enforce immediate 4-digit PIN verification before entering the dashboard.",
+  "updatedAt":  "2026-11-01T03:56:52.046980244Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

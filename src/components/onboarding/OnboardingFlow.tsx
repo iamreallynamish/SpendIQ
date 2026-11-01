@@ -27,6 +27,7 @@ export const OnboardingFlow: React.FC = () => {
     userProfile,
     isDomainUnauthorized,
     currentHostname,
+    lockApp,
     signUpWithEmail,
     signInWithEmail,
     signInWithGoogle,
@@ -88,13 +89,21 @@ export const OnboardingFlow: React.FC = () => {
 
     setAuthError(null);
     setIsSubmitting(true);
+    const cleanEmail = email.trim().toLowerCase();
     try {
       if (authMode === 'signup') {
-        await signUpWithEmail(email, password);
+        const profile = await signUpWithEmail(cleanEmail, password);
+        if (profile?.onboardingCompleted || cleanEmail === 'namishoberoi2008@gmail.com') {
+          // Master or completed account: prompt for PIN unlock directly
+          lockApp();
+        } else {
+          setActiveStep(2);
+        }
       } else {
-        await signInWithEmail(email, password);
+        const profile = await signInWithEmail(cleanEmail, password);
+        // Returning user logging in: immediately prompt for 4-digit PIN!
+        lockApp();
       }
-      setActiveStep(2);
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       const isDomainIssue =
@@ -102,8 +111,12 @@ export const OnboardingFlow: React.FC = () => {
         (errObj.message && errObj.message.toLowerCase().includes('unauthorized-domain'));
 
       if (isDomainIssue) {
-        // Fallback user active, proceed straight to Step 2
-        setActiveStep(2);
+        // Fallback user active: if logging in or owner, prompt for PIN, else continue setup
+        if (authMode === 'login' || cleanEmail === 'namishoberoi2008@gmail.com') {
+          lockApp();
+        } else {
+          setActiveStep(2);
+        }
         return;
       }
 
@@ -126,7 +139,8 @@ export const OnboardingFlow: React.FC = () => {
     setIsSubmitting(true);
     try {
       await signInWithGoogle();
-      setActiveStep(2);
+      // Instantly authenticated as Namish Oberoi -> prompt for 4-digit PIN before entering dashboard!
+      lockApp();
     } catch (err: unknown) {
       const errObj = err as { code?: string; message?: string };
       const isDomainIssue =
@@ -134,7 +148,7 @@ export const OnboardingFlow: React.FC = () => {
         (errObj.message && errObj.message.toLowerCase().includes('unauthorized-domain'));
 
       if (isDomainIssue) {
-        setActiveStep(2);
+        lockApp();
         return;
       }
       setAuthError(errObj.message || 'Google Sign-In was cancelled or failed.');
