@@ -12,7 +12,6 @@ export const BulkSmsModal: React.FC = () => {
     addTransactions,
     showToast,
     data,
-    role,
   } = useFinance();
 
   const [smsText, setSmsText] = useState('');
@@ -50,7 +49,7 @@ export const BulkSmsModal: React.FC = () => {
         cardCode: manualCard,
         cardUsed: manualCard === 'AXIS' ? 'Axis Bank XX7117' : 'ICICI Forex XX0817',
         category: cat,
-        spender: isSeven || hasSuica ? 'Son' : role === 'DAD' ? 'Dad' : 'Son',
+        spender: 'Cardholder',
         date: dInfo.dateStr,
         dateRecognized: true,
         timestampMs: Date.now() + 100,
@@ -62,7 +61,7 @@ export const BulkSmsModal: React.FC = () => {
     }
 
     setStagedItems(parsed);
-  }, [smsText, manualMerchant, manualCard, manualCategory, manualDate, manualAmount, manualBal, role]);
+  }, [smsText, manualMerchant, manualCard, manualCategory, manualDate, manualAmount, manualBal]);
 
   if (activeModal !== 'smsModal') return null;
 

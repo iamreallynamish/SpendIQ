@@ -4,7 +4,7 @@ import { formatFromJpy } from '../../utils/currency';
 import { CreditCard, Trash2, Plus, Calendar, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 export const SubscriptionsView: React.FC = () => {
-  const { data, currency, addSubscription, deleteSubscription, role } = useFinance();
+  const { data, currency, addSubscription, deleteSubscription } = useFinance();
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState('');
   const [cycle, setCycle] = useState('Monthly on 1st');
@@ -208,16 +208,14 @@ export const SubscriptionsView: React.FC = () => {
 
               <div className="pt-3 border-t border-white/[0.08] flex items-center justify-between text-xs">
                 <span className="text-[10px] text-zinc-500 font-mono">Auto-renews monthly</span>
-                {role === 'DAD' && (
-                  <button
-                    type="button"
-                    onClick={() => deleteSubscription(sub.id)}
-                    title="Delete subscription"
-                    className="text-zinc-500 hover:text-rose-400 transition-colors p-1 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => deleteSubscription(sub.id)}
+                  title="Delete subscription"
+                  className="text-zinc-500 hover:text-rose-400 transition-colors p-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           ))}

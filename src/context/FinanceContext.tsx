@@ -13,16 +13,16 @@ import {
   CardCode,
 } from '../types/finance';
 import { INITIAL_DATA } from '../constants/initialData';
+import { PROJECT_RESTORE_POINT, RESTORE_POINT_METADATA } from '../constants/projectRestorePoint';
 import { recalculateCardBalances, getTxMonthKey, smartCategorizeExpense, normalizeMerchantName, extractSmsDate } from '../utils/smsParser';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, onSnapshot, setDoc, getDocFromServer } from 'firebase/firestore';
+import { useAuth } from './AuthContext';
 
 const STORAGE_KEY = 'spendiq_family_db_v4';
 const DEFAULT_CLOUD_URL = 'https://spendiq-7de3d.firebaseapp.com';
 
 interface FinanceContextType {
-  role: Role;
-  setRole: (r: Role) => void;
   currency: Currency;
   setCurrency: (c: Currency) => void;
   selectedMonth: string;
@@ -95,6 +95,9 @@ interface FinanceContextType {
   importSyncCode: (base64Str: string) => boolean;
   resetToDefault: () => void;
   restoreOriginalTransactions: () => Promise<void>;
+  restoreProjectSnapshot: () => Promise<void>;
+  downloadSnapshotJson: () => void;
+  restorePointMetadata: typeof RESTORE_POINT_METADATA;
   wipeToBlankSlate: () => Promise<void>;
 }
 
@@ -115,8 +118,23 @@ function deduplicateTransactions(txs: Transaction[]): Transaction[] {
   return res;
 }
 
+const EMPTY_DATABASE_PAYLOAD: FamilyDatabasePayload = {
+  transactions: [],
+  fixedExpenses: [],
+  subscriptions: [],
+  stocks: [],
+  calendarNotes: {},
+  nextMonthPlan: [],
+  nextMonthConfig: { targetMonth: 'Nov-2026', dailyAvgJpy: 0, daysInMonth: 30 },
+  icici: { balanceJpy: 0, spentJpy: 0, nextDate: '2026-11-05', lastSyncInfo: 'Ready' },
+  axis: { balanceInr: 0, spentInr: 0, nextDate: '2026-11-18', lastSyncInfo: 'Ready' },
+  updatedAt: Date.now(),
+};
+
 export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [role, setRole] = useState<Role>('DAD');
+  const { currentUser, userProfile } = useAuth();
+  const isOwnerUser = (currentUser?.email || '').toLowerCase() === 'namishoberoi2008@gmail.com';
+
   const [currency, setCurrency] = useState<Currency>('JPY');
   const [selectedMonth, setSelectedMonth] = useState<string>('Oct-2026');
   const [activeView, setActiveView] = useState<string>('dashboard');
@@ -140,35 +158,42 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Prevent local write loops
   const isUpdatingFromRemoteRef = useRef<boolean>(false);
 
-  // Initialize Core Data from fresh storage or master data
+  // Initialize Core Data from fresh storage or master data (strictly for owner)
   const [data, setData] = useState<FamilyDatabasePayload>(() => {
     try {
-      const savedV5 = localStorage.getItem('spendiq_family_db_v5');
-      if (savedV5) {
-        const parsed = JSON.parse(savedV5);
-        if (parsed && Array.isArray(parsed.transactions) && parsed.transactions.length > 0) {
-          return {
-            ...INITIAL_DATA,
-            ...parsed,
-            transactions: deduplicateTransactions(parsed.transactions),
-          };
+      if (currentUser?.uid) {
+        const userSaved = localStorage.getItem(`spendiq_user_db_${currentUser.uid}`);
+        if (userSaved) {
+          const parsed = JSON.parse(userSaved);
+          if (parsed && Array.isArray(parsed.transactions)) {
+            return {
+              ...EMPTY_DATABASE_PAYLOAD,
+              ...parsed,
+              transactions: deduplicateTransactions(parsed.transactions),
+            };
+          }
         }
       }
-      const savedV4 = localStorage.getItem(STORAGE_KEY);
-      if (savedV4) {
-        const parsed = JSON.parse(savedV4);
-        if (parsed && Array.isArray(parsed.transactions) && parsed.transactions.length > 0) {
-          return {
-            ...INITIAL_DATA,
-            ...parsed,
-            transactions: deduplicateTransactions(parsed.transactions),
-          };
+
+      // Only namishoberoi2008@gmail.com gets access to the master restore point
+      if (isOwnerUser) {
+        const savedV5 = localStorage.getItem('spendiq_family_db_v5');
+        if (savedV5) {
+          const parsed = JSON.parse(savedV5);
+          if (parsed && Array.isArray(parsed.transactions) && parsed.transactions.length > 0) {
+            return {
+              ...INITIAL_DATA,
+              ...parsed,
+              transactions: deduplicateTransactions(parsed.transactions),
+            };
+          }
         }
+        return PROJECT_RESTORE_POINT;
       }
     } catch {
       // Fallback
     }
-    return INITIAL_DATA;
+    return isOwnerUser ? PROJECT_RESTORE_POINT : EMPTY_DATABASE_PAYLOAD;
   });
 
   const localDataRef = useRef<FamilyDatabasePayload>(data);
@@ -201,18 +226,37 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Persist locally
   const saveLocally = useCallback((newData: FamilyDatabasePayload) => {
     try {
-      localStorage.setItem('spendiq_family_db_v5', JSON.stringify(newData));
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      if (currentUser?.uid) {
+        localStorage.setItem(`spendiq_user_db_${currentUser.uid}`, JSON.stringify(newData));
+      }
+      if (isOwnerUser) {
+        localStorage.setItem('spendiq_family_db_v5', JSON.stringify(newData));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      }
     } catch {
       // ignore
     }
-  }, []);
+  }, [currentUser?.uid, isOwnerUser]);
 
-  // Sync to Firestore and broadcast live to everyone
+  // Sync currency preference when user profile loads or changes
+  useEffect(() => {
+    if (userProfile?.primaryCurrency) {
+      setCurrency(userProfile.primaryCurrency);
+    }
+  }, [userProfile?.primaryCurrency]);
+
+  const getLedgerDocRef = useCallback(() => {
+    if (currentUser?.uid) {
+      return doc(db, 'users', currentUser.uid, 'ledger', 'current');
+    }
+    return doc(db, 'familyLedger', 'current');
+  }, [currentUser?.uid]);
+
+  // Sync to Firestore and broadcast live to everyone / user vault
   const syncToFirestore = useCallback(async (payload: FamilyDatabasePayload) => {
     try {
       setIsCloudSyncing(true);
-      const ledgerDocRef = doc(db, 'familyLedger', 'current');
+      const ledgerDocRef = getLedgerDocRef();
       await setDoc(ledgerDocRef, payload);
       setIsFirestoreConnected(true);
       setDbStatusMsg(`Firestore Live (${payload.transactions.length} Tx)`);
@@ -223,7 +267,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     } finally {
       setIsCloudSyncing(false);
     }
-  }, []);
+  }, [getLedgerDocRef]);
 
   // Real-time Firestore onSnapshot listener
   useEffect(() => {
@@ -231,14 +275,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     async function initFirestore() {
       try {
-        // Test connection as instructed in Firebase guidelines
-        try {
-          await getDocFromServer(doc(db, 'test', 'connection'));
-        } catch {
-          // Normal if 'test/connection' doc doesn't exist; indicates server reached
-        }
-
-        const ledgerDocRef = doc(db, 'familyLedger', 'current');
+        const ledgerDocRef = getLedgerDocRef();
         unsub = onSnapshot(
           ledgerDocRef,
           (snapshot) => {
@@ -288,15 +325,17 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                 }, 100);
               }
             } else {
-              // First time: initialize document with current local data in Firestore
-              const payloadToInit = localDataRef.current.transactions.length > 0 ? localDataRef.current : INITIAL_DATA;
+              // Initialize document with PROJECT_RESTORE_POINT only for master user, blank slate for other users
+              const payloadToInit = isOwnerUser
+                ? (localDataRef.current.transactions.length > 0 ? localDataRef.current : PROJECT_RESTORE_POINT)
+                : EMPTY_DATABASE_PAYLOAD;
               setDoc(ledgerDocRef, payloadToInit)
                 .then(() => {
                   setIsFirestoreConnected(true);
                   setDbStatusMsg(`Firestore Connected (${payloadToInit.transactions.length} Tx)`);
                 })
                 .catch((err) => {
-                  handleFirestoreError(err, OperationType.WRITE, 'familyLedger/current');
+                  handleFirestoreError(err, OperationType.WRITE, ledgerDocRef.path);
                 });
             }
           },
@@ -318,7 +357,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => {
       if (unsub) unsub();
     };
-  }, [saveLocally]);
+  }, [getLedgerDocRef, saveLocally]);
 
   const openCategoryInspector = useCallback((cat: string) => {
     setInspectingCategory(cat);
@@ -382,7 +421,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       category: cat,
       cardCode: card,
       cardUsed: card === 'AXIS' ? 'Axis Bank XX7117' : 'ICICI Forex XX0817',
-      spender: role === 'DAD' ? 'Dad' : 'Son',
+      spender: 'Cardholder',
       date: dateStr,
       timestampMs: ts,
       amountJpy: card === 'AXIS' ? Math.round(amt * 1.8) : amt,
@@ -411,7 +450,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     showToast(`Recorded new ${card} swipe for ${store} (¥${amt.toLocaleString()})!`);
     return newTx;
-  }, [role, setSelectedMonth, saveLocally, syncToFirestore, showToast]);
+  }, [setSelectedMonth, saveLocally, syncToFirestore, showToast]);
 
   // Compute available months dynamically from transactions
   const availableMonths = useMemo(() => {
@@ -436,7 +475,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const pushToCloud = useCallback(async (showFeedback = true) => {
     try {
       setIsCloudSyncing(true);
-      const ledgerDocRef = doc(db, 'familyLedger', 'current');
+      const ledgerDocRef = getLedgerDocRef();
       await setDoc(ledgerDocRef, data);
       setIsFirestoreConnected(true);
       setDbStatusMsg(`Firestore Live (${data.transactions.length} Tx)`);
@@ -448,12 +487,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     } finally {
       setIsCloudSyncing(false);
     }
-  }, [data, showToast]);
+  }, [data, getLedgerDocRef, showToast]);
 
   const pullFromCloud = useCallback(async (showFeedback = true) => {
     try {
       setIsCloudSyncing(true);
-      const ledgerDocRef = doc(db, 'familyLedger', 'current');
+      const ledgerDocRef = getLedgerDocRef();
       const snap = await getDocFromServer(ledgerDocRef);
       if (snap.exists()) {
         const remote = snap.data() as FamilyDatabasePayload;
@@ -627,6 +666,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     axisNextDate: string
   ) => {
     setData((prev) => {
+      const now = Date.now();
       const nextState = {
         ...prev,
         icici: {
@@ -634,14 +674,16 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
           balanceJpy: iciciBal,
           nextDate: iciciNextDate,
           lastSyncInfo: 'Manual Admin Override',
+          manualOverrideTimestamp: now,
         },
         axis: {
           ...prev.axis,
           balanceInr: axisLimit,
           nextDate: axisNextDate,
           lastSyncInfo: 'Manual Admin Override',
+          manualOverrideTimestamp: now,
         },
-        updatedAt: Date.now(),
+        updatedAt: now,
       };
       saveLocally(nextState);
       syncToFirestore(nextState);
@@ -952,12 +994,51 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     showToast(`Restored ${INITIAL_DATA.transactions.length} master transactions & cards!`);
   }, [saveLocally, syncToFirestore, showToast]);
 
+  const restoreProjectSnapshot = useCallback(async () => {
+    if (!isOwnerUser) {
+      showToast('Master restore point is only accessible to namishoberoi2008@gmail.com');
+      return;
+    }
+    setData(PROJECT_RESTORE_POINT);
+    saveLocally(PROJECT_RESTORE_POINT);
+    await syncToFirestore(PROJECT_RESTORE_POINT);
+    showToast(`Restored verified snapshot with ${PROJECT_RESTORE_POINT.transactions.length} transactions & card balances!`);
+  }, [isOwnerUser, saveLocally, syncToFirestore, showToast]);
+
   const restoreOriginalTransactions = useCallback(async () => {
-    setData(INITIAL_DATA);
-    saveLocally(INITIAL_DATA);
-    await syncToFirestore(INITIAL_DATA);
-    showToast(`Successfully returned all ${INITIAL_DATA.transactions.length} transactions back!`);
-  }, [saveLocally, syncToFirestore, showToast]);
+    if (!isOwnerUser) {
+      showToast('Master restore point is only accessible to namishoberoi2008@gmail.com');
+      return;
+    }
+    setData(PROJECT_RESTORE_POINT);
+    saveLocally(PROJECT_RESTORE_POINT);
+    await syncToFirestore(PROJECT_RESTORE_POINT);
+    showToast(`Successfully returned all ${PROJECT_RESTORE_POINT.transactions.length} transactions back!`);
+  }, [isOwnerUser, saveLocally, syncToFirestore, showToast]);
+
+  const downloadSnapshotJson = useCallback(() => {
+    try {
+      const exportData = {
+        ...data,
+        exportedAt: new Date().toISOString(),
+        version: '1.0-snapshot',
+        meta: RESTORE_POINT_METADATA,
+      };
+      const jsonStr = JSON.stringify(exportData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spendiq-family-ledger-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded project snapshot JSON successfully!');
+    } catch {
+      showToast('Could not download snapshot JSON');
+    }
+  }, [data, showToast]);
 
   const wipeToBlankSlate = useCallback(async () => {
     const blank: FamilyDatabasePayload = {
@@ -987,8 +1068,6 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   return (
     <FinanceContext.Provider
       value={{
-        role,
-        setRole,
         currency,
         setCurrency,
         selectedMonth,
@@ -1051,6 +1130,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         importSyncCode,
         resetToDefault,
         restoreOriginalTransactions,
+        restoreProjectSnapshot,
+        downloadSnapshotJson,
+        restorePointMetadata: RESTORE_POINT_METADATA,
         wipeToBlankSlate,
       }}
     >

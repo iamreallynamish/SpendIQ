@@ -345,6 +345,72 @@ export function isSmsTransactionCandidate(line: string): boolean {
   return hasDigits && hasMoneyOrTxKeyword;
 }
 
+/**
+ * Comprehensive bank balance extractor supporting all real-world SMS patterns, including:
+ * - "Current available balance on your Forex Prepaid Card is JPY 80,136.00 0."
+ * - "Available Balance: JPY 60,916"
+ * - "Avl Bal: JPY 42,000"
+ * - "Available limit on your card is INR 1,43,800"
+ * - "Avl Lmt: INR 1,45,000"
+ * - "Balance is JPY 42,000"
+ * - "Rem Bal: JPY 55,000"
+ */
+export function extractSmsBalance(
+  line: string,
+  cardCode: CardCode = 'ICICI'
+): { balance: number; currency: 'INR' | 'JPY'; matchedSegment: string } | null {
+  if (!line || typeof line !== 'string') return null;
+
+  // 1. Locate the balance / available limit trigger keyword
+  const balTriggerRegex = /(?:(?:Curr(?:ent)?\s+)?(?:Av(?:ail(?:able)?)?|Avbl\.?|Rem(?:aining)?|Total|Updated|Card|Forex)?\s*(?:Av(?:ail(?:able)?)?|Avbl\.?)?\s*(?:Bal(?:ance)?|Lmt|Limit)|\bBal(?:ance)?|\bLmt\b|\bLimit\b)/i;
+  const triggerMatch = line.match(balTriggerRegex);
+  if (!triggerMatch || triggerMatch.index === undefined) return null;
+
+  const triggerIdx = triggerMatch.index;
+  const afterTrigger = line.slice(triggerIdx);
+
+  // Check for explicit currency + amount in the balance segment (e.g. "JPY 80,136.00" or "80,136.00 JPY")
+  const explicitCurrencyMatch = afterTrigger.match(
+    /(?:(JPY|INR|USD|Rs\.?|₹|¥|\$)\s*)(\d[\d,]*(?:\.\d{1,2})?)|(\d[\d,]*(?:\.\d{1,2})?)\s*(JPY|INR|USD|Rs\.?|₹|¥|\$)/i
+  );
+  if (explicitCurrencyMatch) {
+    const numStr = explicitCurrencyMatch[2] || explicitCurrencyMatch[3];
+    const currStr = (explicitCurrencyMatch[1] || explicitCurrencyMatch[4] || '').toUpperCase();
+    const parsedNum = Math.round(parseFloat(numStr.replace(/,/g, '')));
+    if (!isNaN(parsedNum) && parsedNum >= 0) {
+      const isInr = currStr.includes('INR') || currStr.includes('RS') || currStr.includes('₹');
+      const isJpy = currStr.includes('JPY') || currStr.includes('¥');
+      const currency: 'INR' | 'JPY' = isInr ? 'INR' : isJpy ? 'JPY' : cardCode === 'AXIS' ? 'INR' : 'JPY';
+      return {
+        balance: parsedNum,
+        currency,
+        matchedSegment: afterTrigger,
+      };
+    }
+  }
+
+  // Check for number following "is", ":", "-", "=", or whitespace after balance phrase
+  const numberAfterVerb = afterTrigger.match(
+    /(?:is|:|-|=|\s)\s*(?:(?:approx|about|around)\s*)?(?:(JPY|INR|USD|Rs\.?|₹|¥|\$)\s*)?(\d[\d,]*(?:\.\d{1,2})?)\s*(JPY|INR|USD|Rs\.?|₹|¥|\$)?/i
+  );
+  if (numberAfterVerb && numberAfterVerb[2]) {
+    const parsedNum = Math.round(parseFloat(numberAfterVerb[2].replace(/,/g, '')));
+    if (!isNaN(parsedNum) && parsedNum >= 0) {
+      const currStr = (numberAfterVerb[1] || numberAfterVerb[3] || '').toUpperCase();
+      const isInr = currStr.includes('INR') || currStr.includes('RS') || currStr.includes('₹');
+      const isJpy = currStr.includes('JPY') || currStr.includes('¥');
+      const currency: 'INR' | 'JPY' = isInr ? 'INR' : isJpy ? 'JPY' : cardCode === 'AXIS' ? 'INR' : 'JPY';
+      return {
+        balance: parsedNum,
+        currency,
+        matchedSegment: afterTrigger,
+      };
+    }
+  }
+
+  return null;
+}
+
 export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem | null {
   if (!isSmsTransactionCandidate(line)) {
     return null;
@@ -355,26 +421,16 @@ export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem | 
   const cardUsed = isAxis ? 'Axis Bank XX7117' : 'ICICI Forex XX0817';
 
   // 1. Balance extraction
+  const balInfo = extractSmsBalance(line, cardCode);
   let smsBalanceRaw: number | null = null;
   let smsBalanceCurrency: 'INR' | 'JPY' = isAxis ? 'INR' : 'JPY';
+  let lineWithoutBal = line;
 
-  // Regex matching both "Avl Bal JPY 42,000" and "Avl Bal: 42,000 JPY"
-  const balRegex = /(?:Avl\.?\s*Bal(?:ance)?|Available\s*Bal(?:ance)?|Avbl\.?\s*Bal(?:ance)?|Avl\.?\s*Lmt|Avl\.?\s*Limit|Available\s*Limit|Curr(?:ent)?\s*Bal(?:ance)?|Rem(?:aining)?\s*Bal(?:ance)?|Card\s*Bal(?:ance)?|\bBal(?:ance)?)\s*(?:is|:|-)?\s*(?:(JPY|INR|USD|Rs\.?|¥|₹|\$)\s*)?([\d,]+(?:\.\d{1,2})?)\s*(JPY|INR|USD|Rs\.?|¥|₹|\$)?/i;
-  const balMatch = line.match(balRegex);
-  if (balMatch && balMatch[2]) {
-    const parsedBal = Math.round(parseFloat(balMatch[2].replace(/,/g, '')));
-    if (!isNaN(parsedBal)) {
-      smsBalanceRaw = parsedBal;
-      const sym = ((balMatch[1] || balMatch[3]) || '').toUpperCase();
-      if (sym.includes('INR') || sym.includes('RS') || sym.includes('₹')) {
-        smsBalanceCurrency = 'INR';
-      } else if (sym.includes('JPY') || sym.includes('¥')) {
-        smsBalanceCurrency = 'JPY';
-      }
-    }
+  if (balInfo) {
+    smsBalanceRaw = balInfo.balance;
+    smsBalanceCurrency = balInfo.currency;
+    lineWithoutBal = line.replace(balInfo.matchedSegment, ' ');
   }
-
-  const lineWithoutBal = balMatch ? line.replace(balMatch[0], ' ') : line;
 
   // 2. Amount extraction (Strict - do NOT fake amounts!)
   let amountJpy = 0;
@@ -547,7 +603,7 @@ export function parseSingleSmsLine(line: string, seqIndex = 0): StagedSmsItem | 
     spender,
     date: dateInfo.dateStr,
     dateRecognized: dateInfo.recognized,
-    timestampMs: dateInfo.timestampMs + seqIndex,
+    timestampMs: normalizedCardBalance !== null ? (dateInfo.timestampMs + 43199000 + seqIndex) : (dateInfo.timestampMs + seqIndex),
     amountJpy,
     amountInr,
     nativeCurrency,
@@ -588,6 +644,10 @@ export function recalculateCardBalances(
   let newIciciBalance = currentIcici.balanceJpy ?? 0;
   let newIciciLastSync = currentIcici.lastSyncInfo || 'Ready';
 
+  // Check if manual override was set by Dad
+  const isIciciManual = currentIcici.lastSyncInfo?.includes('Manual') || !!currentIcici.manualOverrideTimestamp;
+  const iciciManualTs = currentIcici.manualOverrideTimestamp || (isIciciManual ? 1793190000000 : 0);
+
   // Find the latest transaction that has an explicit bank SMS balance
   let latestIciciAnchorIdx = -1;
   for (let i = iciciTxs.length - 1; i >= 0; i--) {
@@ -597,10 +657,34 @@ export function recalculateCardBalances(
     }
   }
 
-  if (latestIciciAnchorIdx !== -1) {
+  // Check if there is a newer SMS anchor arrived after the manual override
+  const hasNewerIciciSmsAnchor =
+    latestIciciAnchorIdx !== -1 &&
+    (!isIciciManual || (iciciTxs[latestIciciAnchorIdx].timestampMs || 0) > iciciManualTs);
+
+  if (hasNewerIciciSmsAnchor && latestIciciAnchorIdx !== -1) {
     const anchor = iciciTxs[latestIciciAnchorIdx];
     let runningBal = Number(anchor.smsBalance);
     // Deduct every transaction that comes after this anchor
+    for (let j = latestIciciAnchorIdx + 1; j < iciciTxs.length; j++) {
+      runningBal = Math.max(0, runningBal - (Number(iciciTxs[j].amountJpy) || 0));
+    }
+    newIciciBalance = runningBal;
+    newIciciLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
+  } else if (isIciciManual) {
+    // Dad's explicit manual override takes precedence over older SMS anchors
+    let runningBal = Number(currentIcici.balanceJpy ?? 0);
+    // Only deduct transactions that occurred after the manual override timestamp
+    for (const tx of iciciTxs) {
+      if ((tx.timestampMs || 0) > iciciManualTs) {
+        runningBal = Math.max(0, runningBal - (Number(tx.amountJpy) || 0));
+      }
+    }
+    newIciciBalance = runningBal;
+    newIciciLastSync = currentIcici.lastSyncInfo || 'Manual Admin Override';
+  } else if (latestIciciAnchorIdx !== -1) {
+    const anchor = iciciTxs[latestIciciAnchorIdx];
+    let runningBal = Number(anchor.smsBalance);
     for (let j = latestIciciAnchorIdx + 1; j < iciciTxs.length; j++) {
       runningBal = Math.max(0, runningBal - (Number(iciciTxs[j].amountJpy) || 0));
     }
@@ -627,6 +711,9 @@ export function recalculateCardBalances(
   let newAxisBalance = currentAxis.balanceInr ?? 0;
   let newAxisLastSync = currentAxis.lastSyncInfo || 'Ready';
 
+  const isAxisManual = currentAxis.lastSyncInfo?.includes('Manual') || !!currentAxis.manualOverrideTimestamp;
+  const axisManualTs = currentAxis.manualOverrideTimestamp || (isAxisManual ? 1793190000000 : 0);
+
   let latestAxisAnchorIdx = -1;
   for (let i = axisTxs.length - 1; i >= 0; i--) {
     if (axisTxs[i].smsBalance !== null && axisTxs[i].smsBalance !== undefined) {
@@ -635,7 +722,30 @@ export function recalculateCardBalances(
     }
   }
 
-  if (latestAxisAnchorIdx !== -1) {
+  const hasNewerAxisSmsAnchor =
+    latestAxisAnchorIdx !== -1 &&
+    (!isAxisManual || (axisTxs[latestAxisAnchorIdx].timestampMs || 0) > axisManualTs);
+
+  if (hasNewerAxisSmsAnchor && latestAxisAnchorIdx !== -1) {
+    const anchor = axisTxs[latestAxisAnchorIdx];
+    let runningBalInr = Number(anchor.smsBalance);
+    for (let j = latestAxisAnchorIdx + 1; j < axisTxs.length; j++) {
+      const deductInr = Number(axisTxs[j].amountInr) || Math.round((Number(axisTxs[j].amountJpy) || 0) / 1.8);
+      runningBalInr = Math.max(0, runningBalInr - deductInr);
+    }
+    newAxisBalance = runningBalInr;
+    newAxisLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
+  } else if (isAxisManual) {
+    let runningBalInr = Number(currentAxis.balanceInr ?? 0);
+    for (const tx of axisTxs) {
+      if ((tx.timestampMs || 0) > axisManualTs) {
+        const deductInr = Number(tx.amountInr) || Math.round((Number(tx.amountJpy) || 0) / 1.8);
+        runningBalInr = Math.max(0, runningBalInr - deductInr);
+      }
+    }
+    newAxisBalance = runningBalInr;
+    newAxisLastSync = currentAxis.lastSyncInfo || 'Manual Admin Override';
+  } else if (latestAxisAnchorIdx !== -1) {
     const anchor = axisTxs[latestAxisAnchorIdx];
     let runningBalInr = Number(anchor.smsBalance);
     for (let j = latestAxisAnchorIdx + 1; j < axisTxs.length; j++) {

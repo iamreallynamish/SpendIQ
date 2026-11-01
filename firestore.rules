@@ -10,28 +10,25 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function isValidTransaction(data) {
-      return data.merchant is string && data.merchant.size() <= 100 &&
-             data.category is string && data.category.size() <= 50 &&
-             data.cardCode in ['ICICI', 'AXIS'] &&
-             data.amountJpy is number &&
-             data.date is string && data.date.size() <= 30;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    match /transactions/{transactionId} {
-      allow read: if isValidId(transactionId);
-      allow create, update: if isValidId(transactionId) && isValidTransaction(request.resource.data);
-      allow delete: if isValidId(transactionId);
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    match /cards/{cardId} {
-      allow read: if isValidId(cardId);
-      allow write: if isValidId(cardId);
+    // Authenticated User Profiles & Isolated Private Ledgers
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /{subCollection=**} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
-    match /familyLedger/{ledgerId} {
-      allow read: if isValidId(ledgerId);
-      allow write: if isValidId(ledgerId);
+    match /test/{docId} {
+      allow read, write: if isValidId(docId);
     }
   }
 }

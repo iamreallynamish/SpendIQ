@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
+import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
+import { PinUnlockOverlay } from './components/onboarding/PinUnlockOverlay';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
 import { Toast } from './components/common/Toast';
@@ -14,7 +17,6 @@ import { InsightsView } from './components/insights/InsightsView';
 import { BulkSmsModal } from './components/modals/BulkSmsModal';
 import { CardBalancesModal } from './components/modals/CardBalancesModal';
 import { EditTransactionModal } from './components/modals/EditTransactionModal';
-import { CloudDbModal } from './components/modals/CloudDbModal';
 import { AddItemModal } from './components/modals/AddFixedItemModal';
 import { CategoryDetailModal } from './components/modals/CategoryDetailModal';
 import { ReceiptScannerModal } from './components/modals/ReceiptScannerModal';
@@ -80,7 +82,6 @@ const MainLayout: React.FC = () => {
       <BulkSmsModal />
       <CardBalancesModal />
       <EditTransactionModal />
-      <CloudDbModal />
       <AddItemModal />
       <CategoryDetailModal />
       <ReceiptScannerModal />
@@ -92,10 +93,42 @@ const MainLayout: React.FC = () => {
   );
 };
 
-export default function App() {
+const AppContent: React.FC = () => {
+  const { currentUser, userProfile, isAuthLoading, isPinLocked } = useAuth();
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 select-none font-sans">
+        <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-6 shadow-2xl relative">
+          <span className="w-6 h-6 border-2 border-white/20 border-t-[#E8FF1F] rounded-full animate-spin" />
+        </div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-5 h-5 rounded-md bg-white flex items-center justify-center text-black font-extrabold text-[10px]">
+            <span className="border-2 border-black rounded-sm w-2 h-2 inline-block"></span>
+          </div>
+          <span className="font-extrabold text-base tracking-tight text-white">SpendIQ Vault</span>
+        </div>
+        <p className="text-xs text-zinc-500 font-mono">Initializing secure ledger...</p>
+      </div>
+    );
+  }
+
+  if (!currentUser || !userProfile?.onboardingCompleted) {
+    return <OnboardingFlow />;
+  }
+
   return (
     <FinanceProvider>
       <MainLayout />
+      {isPinLocked && <PinUnlockOverlay />}
     </FinanceProvider>
+  );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

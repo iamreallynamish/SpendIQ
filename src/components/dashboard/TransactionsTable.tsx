@@ -12,7 +12,6 @@ export const TransactionsTable: React.FC = () => {
     selectedMonth,
     cardFilter,
     setCardFilter,
-    role,
     deleteTransaction,
     openModal,
     setEditingTxId,
@@ -22,7 +21,6 @@ export const TransactionsTable: React.FC = () => {
     openCategoryInspector,
     openReceiptScannerForTx,
     openReceiptDetailForTx,
-    restoreOriginalTransactions,
   } = useFinance();
 
   // Dynamic categories present in transactions
@@ -150,18 +148,15 @@ export const TransactionsTable: React.FC = () => {
               <th className="py-3 pr-4">Merchant / Source</th>
               <th className="py-3 px-4">Category</th>
               <th className="py-3 px-4">Card Used</th>
-              <th className="py-3 px-4">Spender</th>
               <th className="py-3 px-4">Date</th>
               <th className="py-3 px-4 text-right">Amount</th>
-              <th className="py-3 pl-4 text-right">
-                {role === 'DAD' ? 'Dad Actions' : 'Actions'}
-              </th>
+              <th className="py-3 pl-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.05] text-xs">
             {filteredTxs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-zinc-500 text-xs">
+                <td colSpan={6} className="py-12 text-center text-zinc-500 text-xs">
                   <div className="max-w-md mx-auto space-y-3">
                     <p className="text-zinc-400">
                       No transactions found for the current month / filter.
@@ -169,18 +164,8 @@ export const TransactionsTable: React.FC = () => {
                     <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
                       <button
                         type="button"
-                        onClick={async () => {
-                          await restoreOriginalTransactions();
-                        }}
-                        className="bento-btn-primary px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5 shadow-md cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5 text-black" />
-                        <span>Return All Transactions Back</span>
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => openModal('smsModal')}
-                        className="bento-btn-secondary px-3 py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                        className="bento-btn-secondary px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer"
                       >
                         <ReceiptText className="w-3.5 h-3.5" />
                         <span>Upload / Parse SMS</span>
@@ -265,19 +250,6 @@ export const TransactionsTable: React.FC = () => {
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <span className="font-mono text-[11px] text-zinc-300">
                         {tx.cardUsed}
-                      </span>
-                    </td>
-
-                    {/* Spender */}
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          tx.spender === 'Son'
-                            ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
-                            : 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
-                        }`}
-                      >
-                        {tx.spender}
                       </span>
                     </td>
 

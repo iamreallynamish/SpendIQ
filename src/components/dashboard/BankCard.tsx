@@ -5,7 +5,7 @@ import { getTxMonthKey } from '../../utils/smsParser';
 import { CreditCard, Clock, Edit2, ShieldCheck, User, Zap, ArrowUpRight, TrendingDown } from 'lucide-react';
 
 export const BankCards: React.FC = () => {
-  const { data, currency, openModal, role, setRole, showToast, targetAllowance, selectedMonth } = useFinance();
+  const { data, currency, openModal, showToast, targetAllowance, selectedMonth } = useFinance();
 
   // Dynamically compute real spent amounts from actual transactions in selected month
   const monthTxs = React.useMemo(() => {
@@ -36,12 +36,6 @@ export const BankCards: React.FC = () => {
   // Compute burn rate dynamically
   const currentDailyBurnJpy = Math.max(0, Math.round(iciciSpentJpy / Math.max(1, new Date().getDate())));
   const isOverPace = currentDailyBurnJpy > targetAllowance;
-
-  const toggleRole = () => {
-    const next = role === 'DAD' ? 'SON' : 'DAD';
-    setRole(next);
-    showToast(`Switched session to ${next === 'DAD' ? "Dad's Admin" : "Son's Viewer"}`);
-  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
@@ -183,19 +177,13 @@ export const BankCards: React.FC = () => {
                 <Zap className="w-4 h-4" />
               </span>
               <div>
-                <span className="text-[13px] font-bold text-white block leading-tight">Allowance Pace &amp; Session</span>
-                <span className="text-[10px] text-zinc-400 font-medium">Target: ¥{targetAllowance}/day</span>
+                <span className="text-[13px] font-bold text-white block leading-tight">Allowance Pace &amp; Burn</span>
+                <span className="text-[10px] text-zinc-400 font-medium">Target: ¥{targetAllowance.toLocaleString()}/day</span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={toggleRole}
-              className={`bento-chip cursor-pointer transition-all ${
-                role === 'DAD' ? 'bento-chip-emerald' : 'bento-chip-amber'
-              }`}
-            >
-              {role === 'DAD' ? 'Dad (Admin)' : 'Son (Viewer)'}
-            </button>
+            <span className="bento-chip bento-chip-neon font-mono">
+              ACTIVE
+            </span>
           </div>
 
           {/* Daily Burn Rate vs Target */}
@@ -234,14 +222,14 @@ export const BankCards: React.FC = () => {
         {/* Quick Action Footer */}
         <div className="pt-4 mt-4 border-t border-white/[0.08] flex items-center justify-between">
           <span className="text-[11px] text-zinc-400 truncate">
-            {role === 'DAD' ? 'Full admin rights' : 'Read-only view'}
+            Personal Card Limits Active
           </span>
           <button
             type="button"
-            onClick={toggleRole}
+            onClick={() => openModal('cardBalancesModal')}
             className="text-[11px] font-semibold text-[#E8FF1F] hover:underline cursor-pointer flex items-center gap-1"
           >
-            <span>Switch Role</span>
+            <span>Adjust Balances</span>
             <ArrowUpRight className="w-3 h-3" />
           </button>
         </div>

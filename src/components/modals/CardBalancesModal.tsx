@@ -34,7 +34,7 @@ export const CardBalancesModal: React.FC = () => {
           <div>
             <h3 className="text-sm font-bold text-white tracking-tight">Update Card Balances &amp; Reload Dates</h3>
             <p className="text-[11px] text-zinc-400">
-              Dad&apos;s Admin override for ICICI Forex XX0817 &amp; Axis Card XX7117.
+              Manual balance override for ICICI Forex XX0817 &amp; Axis Card XX7117.
             </p>
           </div>
           <button

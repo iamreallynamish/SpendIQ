@@ -11,7 +11,6 @@ export const SavingsView: React.FC = () => {
     selectedMonth,
     targetAllowance,
     openModal,
-    role,
     deleteStock,
   } = useFinance();
 
@@ -55,18 +54,16 @@ export const SavingsView: React.FC = () => {
           </p>
         </div>
 
-        {role === 'DAD' && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openModal('addStockModal')}
-              className="bento-btn-primary h-8 px-3 text-xs"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Stock Holding</span>
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openModal('addStockModal')}
+            className="bento-btn-primary h-8 px-3 text-xs"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Stock Holding</span>
+          </button>
+        </div>
       </div>
 
       {/* Monthly Savings Calculator Summary */}

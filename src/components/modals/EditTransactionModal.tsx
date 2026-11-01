@@ -18,7 +18,6 @@ export const EditTransactionModal: React.FC = () => {
   const [merchant, setMerchant] = useState('');
   const [category, setCategory] = useState('Convenience Store');
   const [cardCode, setCardCode] = useState<CardCode>('ICICI');
-  const [spender, setSpender] = useState<'Son' | 'Dad'>('Son');
   const [dateStr, setDateStr] = useState('');
   const [amountJpy, setAmountJpy] = useState('');
   const [smsBalance, setSmsBalance] = useState('');
@@ -30,7 +29,6 @@ export const EditTransactionModal: React.FC = () => {
       setMerchant(targetTx.merchant);
       setCategory(targetTx.category);
       setCardCode(targetTx.cardCode);
-      setSpender(targetTx.spender);
       setDateStr(targetTx.date);
       setAmountJpy(String(targetTx.amountJpy));
       setSmsBalance(
@@ -54,7 +52,6 @@ export const EditTransactionModal: React.FC = () => {
       category,
       cardCode,
       cardUsed: cardCode === 'AXIS' ? 'Axis Bank XX7117' : 'ICICI Forex XX0817',
-      spender,
       date: dInfo.dateStr,
       timestampMs: dInfo.timestampMs,
       amountJpy: amt,
@@ -131,17 +128,6 @@ export const EditTransactionModal: React.FC = () => {
               </select>
             </label>
 
-            <label className="block text-xs text-zinc-300">
-              Spender
-              <select
-                value={spender}
-                onChange={(e) => setSpender(e.target.value as 'Son' | 'Dad')}
-                className="mt-1 w-full rounded-lg bg-[#0e1014] border border-white/10 px-3 py-2 text-xs text-white"
-              >
-                <option value="Son">Son</option>
-                <option value="Dad">Dad</option>
-              </select>
-            </label>
 
             <label className="block text-xs text-zinc-300">
               Transaction Date

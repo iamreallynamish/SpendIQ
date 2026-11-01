@@ -39,6 +39,25 @@
       "properties": {
         "updatedAt": { "type": "number" }
       }
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with onboarding, security PIN, and preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "onboardingCompleted": { "type": "boolean" },
+        "lastCompletedStep": { "type": "number" },
+        "pinHash": { "type": "string" },
+        "bankingMethods": { "type": "array" },
+        "primaryCurrency": { "type": "string" },
+        "secondaryCurrency": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["uid", "email"]
     }
   },
   "firestore": {
@@ -53,6 +72,14 @@
     "/familyLedger/{ledgerId}": {
       "schema": "FamilyLedger",
       "description": "Shared real-time family database document for multi-device sync"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Authenticated user profile and onboarding settings"
+    },
+    "/users/{userId}/ledger/{ledgerId}": {
+      "schema": "FamilyLedger",
+      "description": "Per-user private financial ledger records"
     }
   }
 }

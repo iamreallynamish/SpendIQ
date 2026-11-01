@@ -50,7 +50,7 @@ export interface Transaction {
   category: string;
   cardCode: CardCode;
   cardUsed: string;
-  spender: 'Son' | 'Dad';
+  spender?: string;
   date: string; // e.g. "08-Oct-2026"
   timestampMs: number;
   amountJpy: number;
@@ -110,6 +110,7 @@ export interface CardState {
   spentInr?: number;
   nextDate: string;
   lastSyncInfo: string;
+  manualOverrideTimestamp?: number;
 }
 
 export interface CalendarDayNote {
@@ -122,7 +123,7 @@ export interface StagedSmsItem {
   cardCode: CardCode;
   cardUsed: string;
   category: string;
-  spender: 'Son' | 'Dad';
+  spender?: string;
   date: string;
   dateRecognized: boolean;
   timestampMs: number;
