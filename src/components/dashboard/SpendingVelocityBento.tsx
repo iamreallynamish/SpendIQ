@@ -120,8 +120,41 @@ export const SpendingVelocityBento: React.FC = () => {
         </div>
       )}
 
-      {/* Cross-Month Notice when current selected month has 0 transactions */}
-      {hasTransactionsInOtherMonths && (
+      {/* New Month Fresh Start Banner */}
+      {selectedMonth === 'Nov-2026' && activeTxs.length === 0 ? (
+        <div className="p-4 rounded-2xl bg-zinc-900/90 border border-[#E8FF1F]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[0_4px_25px_rgba(232,255,31,0.06)]">
+          <div className="flex items-center gap-3">
+            <span className="w-8 h-8 rounded-xl bg-[#E8FF1F] flex items-center justify-center text-black font-extrabold text-xs shrink-0 shadow-md">
+              <Sparkles className="w-4 h-4" />
+            </span>
+            <div>
+              <div className="text-xs font-bold text-white flex items-center gap-2">
+                <span>November 2026 Fresh Month Active</span>
+                <span className="bento-chip bento-chip-neon font-mono text-[10px]">NEW CYCLE</span>
+              </div>
+              <div className="text-[11px] text-zinc-400 font-mono mt-0.5">
+                Cycle spend is ¥0 &bull; Daily target intact &bull; Card balances carried forward &bull; All October history preserved.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => openModal('smsModal')}
+              className="px-3 py-1.5 rounded-xl bg-[#E8FF1F] hover:bg-[#f1ff52] text-black font-extrabold text-xs transition-colors cursor-pointer shadow-sm"
+            >
+              + Add November Swipe
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedMonth('Oct-2026')}
+              className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-xs text-zinc-300 hover:text-white transition-colors cursor-pointer"
+            >
+              View October (66 Tx)
+            </button>
+          </div>
+        </div>
+      ) : hasTransactionsInOtherMonths ? (
         <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between">
           <div className="text-xs text-amber-200">
             Selected view <strong className="font-mono text-white">{selectedMonth}</strong> has 0 transactions, but you have{' '}
@@ -135,7 +168,7 @@ export const SpendingVelocityBento: React.FC = () => {
             <span>View All Months ({data.transactions.length} Tx)</span>
           </button>
         </div>
-      )}
+      ) : null}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
         {/* CARD 1: SPENDING VELOCITY & ACTION HUB (Span 8) */}

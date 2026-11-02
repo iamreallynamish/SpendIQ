@@ -23,9 +23,9 @@ export const NextMonthView: React.FC = () => {
   const [inputHowPaid, setInputHowPaid] = useState('ICICI Forex Card XX0817');
 
   const config = data.nextMonthConfig || {
-    targetMonth: 'November 2026 (30 Days)',
+    targetMonth: 'December 2026 (31 Days)',
     dailyAvgJpy: 500,
-    daysInMonth: 30,
+    daysInMonth: 31,
   };
 
   const dailyBaselineJpy = config.dailyAvgJpy * config.daysInMonth;
@@ -90,9 +90,9 @@ export const NextMonthView: React.FC = () => {
             onChange={handleMonthChange}
             className="rounded-xl bg-black border border-white/10 px-3 py-2 text-xs font-bold text-white font-mono cursor-pointer focus:outline-none"
           >
-            <option value="November 2026 (30 Days)">November 2026 (30d)</option>
             <option value="December 2026 (31 Days)">December 2026 (31d)</option>
             <option value="January 2027 (31 Days)">January 2027 (31d)</option>
+            <option value="February 2027 (28 Days)">February 2027 (28d)</option>
           </select>
         </div>
       </div>

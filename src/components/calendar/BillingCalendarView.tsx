@@ -19,7 +19,7 @@ export const BillingCalendarView: React.FC = () => {
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteInput, setNoteInput] = useState('');
 
-  const monthKey = selectedMonth === 'ALL' ? 'Oct-2026' : selectedMonth;
+  const monthKey = selectedMonth === 'ALL' ? 'Nov-2026' : selectedMonth;
   const [monShort, yrStr] = monthKey.split('-');
   const daysInCal = monShort === 'Sep' || monShort === 'Nov' ? 30 : 31;
 

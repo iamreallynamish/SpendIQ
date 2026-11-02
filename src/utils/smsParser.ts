@@ -627,7 +627,7 @@ export function recalculateCardBalances(
   currentIcici: CardState,
   currentAxis: CardState
 ): { icici: CardState; axis: CardState } {
-  const monthKey = selectedMonth || 'Oct-2026';
+  const monthKey = selectedMonth || 'Nov-2026';
   const monthTxs =
     monthKey === 'ALL' ? transactions : transactions.filter((t) => getTxMonthKey(t) === monthKey);
 
@@ -644,9 +644,8 @@ export function recalculateCardBalances(
   let newIciciBalance = currentIcici.balanceJpy ?? 0;
   let newIciciLastSync = currentIcici.lastSyncInfo || 'Ready';
 
-  // Check if manual override was set by Dad
+  // Check if manual override was set
   const isIciciManual = currentIcici.lastSyncInfo?.includes('Manual') || !!currentIcici.manualOverrideTimestamp;
-  const iciciManualTs = currentIcici.manualOverrideTimestamp || (isIciciManual ? 1793190000000 : 0);
 
   // Find the latest transaction that has an explicit bank SMS balance
   let latestIciciAnchorIdx = -1;
@@ -657,12 +656,19 @@ export function recalculateCardBalances(
     }
   }
 
-  // Check if there is a newer SMS anchor arrived after the manual override
-  const hasNewerIciciSmsAnchor =
-    latestIciciAnchorIdx !== -1 &&
-    (!isIciciManual || (iciciTxs[latestIciciAnchorIdx].timestampMs || 0) > iciciManualTs);
-
-  if (hasNewerIciciSmsAnchor && latestIciciAnchorIdx !== -1) {
+  if (isIciciManual) {
+    // Explicit manual override takes precedence
+    let runningBal = Number(currentIcici.balanceJpy ?? 0);
+    if (currentIcici.manualOverrideTimestamp) {
+      for (const tx of iciciTxs) {
+        if ((tx.timestampMs || 0) > currentIcici.manualOverrideTimestamp) {
+          runningBal = Math.max(0, runningBal - (Number(tx.amountJpy) || 0));
+        }
+      }
+    }
+    newIciciBalance = runningBal;
+    newIciciLastSync = currentIcici.lastSyncInfo || 'Manual Override';
+  } else if (latestIciciAnchorIdx !== -1) {
     const anchor = iciciTxs[latestIciciAnchorIdx];
     let runningBal = Number(anchor.smsBalance);
     // Deduct every transaction that comes after this anchor
@@ -671,27 +677,7 @@ export function recalculateCardBalances(
     }
     newIciciBalance = runningBal;
     newIciciLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
-  } else if (isIciciManual) {
-    // Dad's explicit manual override takes precedence over older SMS anchors
-    let runningBal = Number(currentIcici.balanceJpy ?? 0);
-    // Only deduct transactions that occurred after the manual override timestamp
-    for (const tx of iciciTxs) {
-      if ((tx.timestampMs || 0) > iciciManualTs) {
-        runningBal = Math.max(0, runningBal - (Number(tx.amountJpy) || 0));
-      }
-    }
-    newIciciBalance = runningBal;
-    newIciciLastSync = currentIcici.lastSyncInfo || 'Manual Admin Override';
-  } else if (latestIciciAnchorIdx !== -1) {
-    const anchor = iciciTxs[latestIciciAnchorIdx];
-    let runningBal = Number(anchor.smsBalance);
-    for (let j = latestIciciAnchorIdx + 1; j < iciciTxs.length; j++) {
-      runningBal = Math.max(0, runningBal - (Number(iciciTxs[j].amountJpy) || 0));
-    }
-    newIciciBalance = runningBal;
-    newIciciLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
   } else if (iciciTxs.length > 0) {
-    // If no SMS balance anchor, take baseline or starting reload (e.g. 100,000) minus total spent
     const totalIciciSpent = iciciTxs.reduce((sum, t) => sum + (Number(t.amountJpy) || 0), 0);
     const baseline = currentIcici.balanceJpy && currentIcici.balanceJpy > 0 ? currentIcici.balanceJpy : 100000;
     newIciciBalance = Math.max(0, baseline - totalIciciSpent);
@@ -712,7 +698,6 @@ export function recalculateCardBalances(
   let newAxisLastSync = currentAxis.lastSyncInfo || 'Ready';
 
   const isAxisManual = currentAxis.lastSyncInfo?.includes('Manual') || !!currentAxis.manualOverrideTimestamp;
-  const axisManualTs = currentAxis.manualOverrideTimestamp || (isAxisManual ? 1793190000000 : 0);
 
   let latestAxisAnchorIdx = -1;
   for (let i = axisTxs.length - 1; i >= 0; i--) {
@@ -722,29 +707,18 @@ export function recalculateCardBalances(
     }
   }
 
-  const hasNewerAxisSmsAnchor =
-    latestAxisAnchorIdx !== -1 &&
-    (!isAxisManual || (axisTxs[latestAxisAnchorIdx].timestampMs || 0) > axisManualTs);
-
-  if (hasNewerAxisSmsAnchor && latestAxisAnchorIdx !== -1) {
-    const anchor = axisTxs[latestAxisAnchorIdx];
-    let runningBalInr = Number(anchor.smsBalance);
-    for (let j = latestAxisAnchorIdx + 1; j < axisTxs.length; j++) {
-      const deductInr = Number(axisTxs[j].amountInr) || Math.round((Number(axisTxs[j].amountJpy) || 0) / 1.8);
-      runningBalInr = Math.max(0, runningBalInr - deductInr);
-    }
-    newAxisBalance = runningBalInr;
-    newAxisLastSync = `${anchor.date} (${anchor.merchant.slice(0, 14)})`;
-  } else if (isAxisManual) {
+  if (isAxisManual) {
     let runningBalInr = Number(currentAxis.balanceInr ?? 0);
-    for (const tx of axisTxs) {
-      if ((tx.timestampMs || 0) > axisManualTs) {
-        const deductInr = Number(tx.amountInr) || Math.round((Number(tx.amountJpy) || 0) / 1.8);
-        runningBalInr = Math.max(0, runningBalInr - deductInr);
+    if (currentAxis.manualOverrideTimestamp) {
+      for (const tx of axisTxs) {
+        if ((tx.timestampMs || 0) > currentAxis.manualOverrideTimestamp) {
+          const deductInr = Number(tx.amountInr) || Math.round((Number(tx.amountJpy) || 0) / 1.8);
+          runningBalInr = Math.max(0, runningBalInr - deductInr);
+        }
       }
     }
     newAxisBalance = runningBalInr;
-    newAxisLastSync = currentAxis.lastSyncInfo || 'Manual Admin Override';
+    newAxisLastSync = currentAxis.lastSyncInfo || 'Manual Override';
   } else if (latestAxisAnchorIdx !== -1) {
     const anchor = axisTxs[latestAxisAnchorIdx];
     let runningBalInr = Number(anchor.smsBalance);
@@ -781,7 +755,7 @@ export function recalculateCardBalances(
 }
 
 export function getTxMonthKey(tx: Transaction): string {
-  if (!tx || !tx.date) return 'Oct-2026';
+  if (!tx || !tx.date) return 'Nov-2026';
   const m = tx.date.match(/\b([A-Za-z]{3})\-(\d{4})\b/);
   if (m) {
     const mon = m[1].charAt(0).toUpperCase() + m[1].slice(1, 3).toLowerCase();

@@ -10,6 +10,7 @@ export const TransactionsTable: React.FC = () => {
     data,
     currency,
     selectedMonth,
+    setSelectedMonth,
     cardFilter,
     setCardFilter,
     deleteTransaction,
@@ -158,18 +159,38 @@ export const TransactionsTable: React.FC = () => {
               <tr>
                 <td colSpan={6} className="py-12 text-center text-zinc-500 text-xs">
                   <div className="max-w-md mx-auto space-y-3">
-                    <p className="text-zinc-400">
-                      No transactions found for the current month / filter.
+                    <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center mx-auto text-[#E8FF1F]">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <p className="text-sm font-semibold text-white">
+                      {selectedMonth === 'Nov-2026'
+                        ? 'November 2026 Ledger is Clean & Ready'
+                        : 'No transactions found for the current month / filter.'}
                     </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                    <p className="text-xs text-zinc-400">
+                      {selectedMonth === 'Nov-2026'
+                        ? 'Your fresh monthly cycle has started. Add your first November swipe via SMS upload or quick entry.'
+                        : 'Upload an SMS receipt or clear your filters to view transactions.'}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
                       <button
                         type="button"
                         onClick={() => openModal('smsModal')}
-                        className="bento-btn-secondary px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                        className="bento-btn-primary px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer"
                       >
                         <ReceiptText className="w-3.5 h-3.5" />
                         <span>Upload / Parse SMS</span>
                       </button>
+                      {selectedMonth === 'Nov-2026' && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMonth('Oct-2026')}
+                          className="bento-btn-secondary px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>View October History (66 Tx)</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </td>

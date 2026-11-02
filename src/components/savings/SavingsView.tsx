@@ -14,7 +14,7 @@ export const SavingsView: React.FC = () => {
     deleteStock,
   } = useFinance();
 
-  const monthKey = selectedMonth === 'ALL' ? 'Oct-2026' : selectedMonth;
+  const monthKey = selectedMonth === 'ALL' ? 'Nov-2026' : selectedMonth;
 
   // Actual spend for ICICI in the selected month
   const monthTxs = useMemo(() => {
@@ -31,7 +31,7 @@ export const SavingsView: React.FC = () => {
   const savedPct = targetAllowance > 0 ? Math.round((netSavedThisMonth / targetAllowance) * 100) : 0;
   const totalEquityJpy = data.stocks.reduce((sum, s) => sum + (Number(s.valueJpy) || 0), 0);
 
-  const monthsToCompare = ['Aug-2026', 'Sep-2026', 'Oct-2026'];
+  const monthsToCompare = ['Sep-2026', 'Oct-2026', 'Nov-2026'];
 
   return (
     <div className="space-y-6 pb-14">

@@ -80,7 +80,7 @@ export const Header: React.FC = () => {
           >
             {availableMonths.map((m) => (
               <option key={m} value={m} className="bg-black text-white">
-                {m.replace('-', ' ')}
+                {m === 'Nov-2026' ? 'Nov 2026 (Current)' : m.replace('-', ' ')}
               </option>
             ))}
             <option value="ALL" className="bg-black text-white">

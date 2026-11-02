@@ -136,10 +136,10 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const isOwnerUser = (currentUser?.email || '').toLowerCase() === 'namishoberoi2008@gmail.com';
 
   const [currency, setCurrency] = useState<Currency>('JPY');
-  const [selectedMonth, setSelectedMonth] = useState<string>('Oct-2026');
+  const [selectedMonth, setSelectedMonth] = useState<string>('Nov-2026');
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [cardFilter, setCardFilter] = useState<'ALL' | 'ICICI' | 'AXIS'>('ALL');
-  const [selectedCalDay, setSelectedCalDay] = useState<number>(8);
+  const [selectedCalDay, setSelectedCalDay] = useState<number>(2);
   const [targetAllowance, setTargetAllowance] = useState<number>(75000);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [inspectingCategory, setInspectingCategory] = useState<string | null>(null);
@@ -304,7 +304,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
                 setData((current) => {
                   const { icici, axis } = recalculateCardBalances(
                     combinedTxs,
-                    selectedMonthRef.current || 'Oct-2026',
+                    selectedMonthRef.current || 'Nov-2026',
                     remote.icici || current.icici,
                     remote.axis || current.axis
                   );
@@ -455,15 +455,15 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   // Compute available months dynamically from transactions
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
+    // Current active fresh month first
+    set.add('Nov-2026');
     data.transactions.forEach((t) => {
       const key = getTxMonthKey(t);
       if (key) set.add(key);
     });
+    set.add('Oct-2026');
     if (selectedMonth && selectedMonth !== 'ALL') {
       set.add(selectedMonth);
-    }
-    if (set.size === 0) {
-      set.add('Oct-2026');
     }
     return Array.from(set);
   }, [data.transactions, selectedMonth]);

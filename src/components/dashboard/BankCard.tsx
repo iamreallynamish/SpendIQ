@@ -29,9 +29,9 @@ export const BankCards: React.FC = () => {
   const iciciJpy = data.icici.balanceJpy ?? 0;
   const axisInr = data.axis.balanceInr ?? 0;
   
-  // Total spend this cycle - automatically driven by uploaded transactions if available
-  const iciciSpentJpy = iciciTxSpentJpy > 0 ? iciciTxSpentJpy : (data.icici.spentJpy ?? 0);
-  const axisSpentInr = axisTxSpentInr > 0 ? axisTxSpentInr : (data.axis.spentInr ?? 0);
+  // Total spend this cycle - accurately driven by actual transactions of the selected month
+  const iciciSpentJpy = iciciTxSpentJpy;
+  const axisSpentInr = axisTxSpentInr;
 
   // Compute burn rate dynamically
   const currentDailyBurnJpy = Math.max(0, Math.round(iciciSpentJpy / Math.max(1, new Date().getDate())));

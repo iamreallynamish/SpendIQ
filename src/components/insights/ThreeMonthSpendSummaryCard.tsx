@@ -37,6 +37,7 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
   const { monthsList, monthlyData, categorySummary, totals } = useMemo(() => {
     // Collect all unique months present in transactions
     const monthKeySet = new Set<string>();
+    monthKeySet.add('Nov-2026');
     data.transactions.forEach((tx) => {
       const k = getTxMonthKey(tx);
       if (k) monthKeySet.add(k);
@@ -44,7 +45,7 @@ export const ThreeMonthSpendSummaryCard: React.FC = () => {
 
     let months = Array.from(monthKeySet);
     if (months.length === 0) {
-      months = ['Aug-2026', 'Sep-2026', 'Oct-2026'];
+      months = ['Sep-2026', 'Oct-2026', 'Nov-2026'];
     } else {
       months.sort((a, b) => {
         const [ma, ya] = a.split('-');
